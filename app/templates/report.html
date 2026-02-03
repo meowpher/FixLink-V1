@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Report Issue - MIT-WPU Vyas Tracker{% endblock %}
+
+{% block content %}
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-5">
+                <div class="success-checkmark">
+                    <div class="check-icon">
+                        <span class="icon-line line-tip"></span>
+                        <span class="icon-line line-long"></span>
+                        <div class="icon-circle"></div>
+                        <div class="icon-fix"></div>
+                    </div>
+                </div>
+                <h3 class="mt-4 mb-2">Thank You!</h3>
+                <p class="text-muted">Your report has been submitted successfully.</p>
+                <div class="ticket-info mt-3">
+                    <span class="ticket-label">Ticket ID:</span>
+                    <span class="ticket-id" id="successTicketId">#0000</span>
+                </div>
+                <button type="button" class="btn btn-primary mt-4" onclick="closeSuccessModal()">
+                    Submit Another Report
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Report Section -->
+<section class="report-section">
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Left Panel: Map -->
+            <div class="col-lg-7 col-xl-8">
+                <div class="map-panel slide-up">
+                    <div class="map-header">
+                        <h4 class="map-title">
+                            <i class="bi bi-map me-2"></i>Select Your Room
+                        </h4>
+                        <div class="floor-selector">
+                            <label for="floorSelect" class="form-label me-2">Floor:</label>
+                            <select class="form-select form-select-sm" id="floorSelect" style="width: auto;">
+                                <option value="">Select Floor</option>
+                                {% for floor in floors %}
+                                <option value="{{ floor.id }}" data-level="{{ floor.level }}" {% if
+                                    selected_floor==floor.id %}selected{% endif %}>
+                                    {{ floor.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Floor Map Container -->
+                    <div class="floor-map-container" id="floorMapContainer">
+                        <div class="floor-map-placeholder">
+                            <i class="bi bi-building display-1 text-muted"></i>
+                            <p class="mt-3">Select a floor to view the interactive map</p>
+                        </div>
+                    </div>
+
+                    <!-- Map Legend -->
+                    <div class="map-legend">
+                        <span class="legend-item">
+                            <span class="legend-color class"></span>
+                            <span>Classroom</span>
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-color lab"></span>
+                            <span>Lab</span>
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-color washroom"></span>
+                            <span>Washroom</span>
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-color selected"></span>
+                            <span>Selected</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Form -->
+            <div class="col-lg-5 col-xl-4">
+                <div class="form-panel slide-up" style="animation-delay: 0.1s;">
+                    <div class="form-header">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/8/87/MIT_-_WPU_Logo.webp"
+                            alt="MIT-WPU Logo" class="form-logo">
+                        <h4 class="form-title">Report Issue</h4>
+                        {% if room_param %}
+                        <div class="room-detected-badge">
+                            <i class="bi bi-check-circle-fill me-1"></i>
+                            Room detected: <strong>{{ room_param }}</strong>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Error Alert -->
+                    <div id="errorAlert" class="alert alert-danger" style="display: none;">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <span id="errorMessage"></span>
+                    </div>
+
+                    <form id="reportForm" method="POST" action="{{ url_for('main.submit_report') }}"
+                        enctype="multipart/form-data">
+                        <!-- Hidden Room Selection -->
+                        <input type="hidden" id="room_id" name="room_id" value="{{ selected_room or '' }}">
+
+                        <!-- Selected Room Display -->
+                        <div class="selected-room-display" id="selectedRoomDisplay">
+                            <div class="room-placeholder">
+                                <i class="bi bi-door-open"></i>
+                                <span>No room selected</span>
+                            </div>
+                        </div>
+
+                        <!-- Reporter Info -->
+                        <div class="form-section">
+                            <h6 class="form-section-title">
+                                <i class="bi bi-person me-1"></i>Your Information
+                            </h6>
+                            <div class="mb-3">
+                                <label for="reporter_name" class="form-label">Full Name *</label>
+                                <input type="text" class="form-control" id="reporter_name" name="reporter_name"
+                                    placeholder="Enter your full name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="prn" class="form-label">PRN *</label>
+                                <input type="text" class="form-control" id="prn" name="prn"
+                                    placeholder="Enter your PRN number" required>
+                                <div class="invalid-feedback">PRN must be numeric</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="reporter_email" class="form-label">Email Address *</label>
+                                <input type="email" class="form-control" id="reporter_email" name="reporter_email"
+                                    placeholder="yourname@mitwpu.edu.in" required>
+                                <div class="invalid-feedback">Please use your official College Email</div>
+                            </div>
+                        </div>
+
+                        <!-- Issue Details -->
+                        <div class="form-section">
+                            <h6 class="form-section-title">
+                                <i class="bi bi-exclamation-circle me-1"></i>Issue Details
+                            </h6>
+                            <div class="mb-3">
+                                <label for="issue_type" class="form-label">Issue Type *</label>
+                                <select class="form-select" id="issue_type" name="issue_type" required>
+                                    <option value="">Select Issue Type</option>
+                                    {% for value, label in issue_types %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="asset_id" class="form-label">Related Asset (Optional)</label>
+                                <select class="form-select" id="asset_id" name="asset_id" disabled>
+                                    <option value="">Select Asset</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description *</label>
+                                <textarea class="form-control" id="description" name="description" rows="3"
+                                    placeholder="Describe the issue in detail..." required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="image" class="form-label">Upload Image</label>
+                                <input type="file" class="form-control" id="image" name="image" accept="image/*">
+                                <div class="form-text">Max 16MB (PNG, JPG, GIF)</div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit" class="btn btn-primary w-100" id="submitBtn">
+                            <i class="bi bi-send me-2"></i>Submit Report
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Pre-selected values from server (if room param was provided)
+    const preSelectedFloor = {{ selected_floor|default (none) | tojson }};
+    const preSelectedRoom = {{ selected_room|default (none) | tojson }};
+    const preSelectedRoomNumber = '{{ room_param|default('') }}';
+</script>
+{% endblock %}

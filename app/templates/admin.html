@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - MIT-WPU Vyas Tracker{% endblock %}
+
+{% block content %}
+<!-- Admin Header -->
+<section class="admin-header vyas-admin-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h1 class="admin-title">
+                    <i class="bi bi-speedometer2 me-2"></i>Admin Dashboard
+                </h1>
+                <p class="admin-subtitle">Vyas Building Maintenance Management</p>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <div class="admin-actions">
+                    <a href="{{ url_for('admin.status_map') }}" class="btn btn-outline-light me-2">
+                        <i class="bi bi-map me-1"></i>Status Map
+                    </a>
+                    <a href="{{ url_for('admin.logout') }}" class="btn btn-outline-danger">
+                        <i class="bi bi-box-arrow-right me-1"></i>Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Statistics Cards -->
+<section class="stats-section">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-3 fade-in" style="animation-delay: 0s;">
+                <div class="stat-card total">
+                    <div class="stat-icon">
+                        <i class="bi bi-clipboard-data"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number">{{ stats.total }}</h3>
+                        <p class="stat-label">Total Tickets</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3 fade-in" style="animation-delay: 0.1s;">
+                <div class="stat-card open">
+                    <div class="stat-icon">
+                        <i class="bi bi-exclamation-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number">{{ stats.open }}</h3>
+                        <p class="stat-label">Open</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3 fade-in" style="animation-delay: 0.2s;">
+                <div class="stat-card progress">
+                    <div class="stat-icon">
+                        <i class="bi bi-arrow-repeat"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number">{{ stats.in_progress }}</h3>
+                        <p class="stat-label">In Progress</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3 fade-in" style="animation-delay: 0.3s;">
+                <div class="stat-card fixed">
+                    <div class="stat-icon">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number">{{ stats.fixed }}</h3>
+                        <p class="stat-label">Fixed</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Filters -->
+<section class="filters-section">
+    <div class="container">
+        <div class="filter-card">
+            <form method="GET" action="{{ url_for('admin.dashboard') }}" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+                        <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open</option>
+                        <option value="in-progress" {% if status_filter == 'in-progress' %}selected{% endif %}>In Progress</option>
+                        <option value="fixed" {% if status_filter == 'fixed' %}selected{% endif %}>Fixed</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="floor" class="form-label">Floor</label>
+                    <select class="form-select" id="floor" name="floor">
+                        <option value="all" {% if floor_filter == 'all' %}selected{% endif %}>All Floors</option>
+                        {% for floor in floors %}
+                        <option value="{{ floor.id }}" {% if floor_filter == floor.id|string %}selected{% endif %}>
+                            {{ floor.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-funnel me-1"></i>Apply Filters
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+
+<!-- Tickets Table -->
+<section class="tickets-section">
+    <div class="container">
+        <div class="tickets-card">
+            <div class="tickets-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-task me-2"></i>Maintenance Tickets
+                </h5>
+                <span class="badge bg-primary">{{ tickets|length }} tickets</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover tickets-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Reporter</th>
+                            <th>Room</th>
+                            <th>Issue</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ticket in tickets %}
+                        <tr data-ticket-id="{{ ticket.id }}">
+                            <td>
+                                <span class="ticket-id">#{{ ticket.id }}</span>
+                            </td>
+                            <td>
+                                <div class="reporter-info">
+                                    <strong>{{ ticket.reporter_name }}</strong>
+                                    <small class="d-block text-muted">PRN: {{ ticket.prn }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="room-info">
+                                    <span class="room-number">{{ ticket.room.number }}</span>
+                                    <small class="d-block text-muted">{{ ticket.room.floor.name }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="issue-info">
+                                    <span class="issue-type">{{ ticket.issue_type|title }}</span>
+                                    <small class="d-block text-muted text-truncate" style="max-width: 150px;">
+                                        {{ ticket.description[:50] }}{% if ticket.description|length > 50 %}...{% endif %}
+                                    </small>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="status-badge status-{{ ticket.status }}">
+                                    {{ ticket.status|title }}
+                                </span>
+                            </td>
+                            <td>
+                                <small class="text-muted">
+                                    {{ ticket.created_at.strftime('%d %b %Y') }}
+                                </small>
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-sm btn-info" onclick="viewTicket({{ ticket.id }})" 
+                                            title="View Details">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    {% if ticket.status == 'open' %}
+                                    <button class="btn btn-sm btn-warning" onclick="updateStatus({{ ticket.id }}, 'in-progress')" 
+                                            title="Mark In Progress">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                    {% endif %}
+                                    {% if ticket.status != 'fixed' %}
+                                    <button class="btn btn-sm btn-success" onclick="updateStatus({{ ticket.id }}, 'fixed')" 
+                                            title="Mark Fixed">
+                                        <i class="bi bi-check-lg"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <i class="bi bi-inbox display-4 text-muted"></i>
+                                <p class="mt-3 text-muted">No tickets found matching your criteria</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Ticket Detail Modal -->
+<div class="modal fade" id="ticketModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-ticket-detailed me-2"></i>Ticket Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="ticketModalBody">
+                <!-- Content loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Update ticket status via AJAX
+    function updateStatus(ticketId, newStatus) {
+        if (!confirm(`Are you sure you want to mark this ticket as ${newStatus}?`)) {
+            return;
+        }
+
+        fetch(`/admin/tickets/${ticketId}/update-status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to update status'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while updating the ticket');
+        });
+    }
+
+    // View ticket details
+    function viewTicket(ticketId) {
+        fetch(`/admin/ticket/${ticketId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const ticket = data.ticket;
+                const modalBody = document.getElementById('ticketModalBody');
+                
+                let imageHtml = '';
+                if (ticket.image_filename) {
+                    imageHtml = `
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Attached Image:</label>
+                            <div class="ticket-image-container">
+                                <img src="/static/uploads/${ticket.image_filename}" 
+                                     alt="Ticket Image" class="img-fluid rounded" 
+                                     style="max-height: 300px;">
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                modalBody.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Ticket ID:</label>
+                                <p>#${ticket.id}</p>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Reporter:</label>
+                                <p>${ticket.reporter_name} (PRN: ${ticket.prn})</p>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Email:</label>
+                                <p>${ticket.reporter_email}</p>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Room:</label>
+                                <p>${ticket.room_number} - ${ticket.floor_name}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Issue Type:</label>
+                                <p>${ticket.issue_type}</p>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Status:</label>
+                                <span class="status-badge status-${ticket.status}">${ticket.status}</span>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Created:</label>
+                                <p>${new Date(ticket.created_at).toLocaleString()}</p>
+                            </div>
+                            ${ticket.fixed_at ? `
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Fixed:</label>
+                                <p>${new Date(ticket.fixed_at).toLocaleString()}</p>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Description:</label>
+                        <p class="ticket-description">${ticket.description}</p>
+                    </div>
+                    ${imageHtml}
+                `;
+                
+                const modal = new bootstrap.Modal(document.getElementById('ticketModal'));
+                modal.show();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to load ticket details');
+        });
+    }
+</script>
+{% endblock %}

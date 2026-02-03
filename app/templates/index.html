@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}MIT-WPU Vyas Smart-Room Tracker{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section vyas-hero">
+    <div class="container">
+        <div class="row align-items-center min-vh-75">
+            <div class="col-lg-6 fade-in">
+                <div class="hero-content">
+                    <div class="building-badge mb-3">
+                        <i class="bi bi-building me-2"></i>Vyas Building
+                    </div>
+                    <h1 class="hero-title">Smart Room Maintenance & Asset Tracker</h1>
+                    <p class="hero-subtitle">
+                        Report room issues quickly using our interactive floor map. 
+                        Select your floor, tap your room, and submit your maintenance request.
+                    </p>
+                    <div class="hero-buttons mt-4">
+                        <a href="{{ url_for('main.report_form') }}" class="btn btn-primary btn-lg me-3">
+                            <i class="bi bi-map me-2"></i>Report an Issue
+                        </a>
+                        <a href="{{ url_for('admin.login') }}" class="btn btn-outline-light btn-lg">
+                            <i class="bi bi-shield-lock me-2"></i>Admin Login
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 fade-in" style="animation-delay: 0.2s;">
+                <div class="hero-illustration">
+                    <div class="floor-preview-card slide-up">
+                        <div class="floor-preview-header">
+                            <span class="floor-label">4th Floor</span>
+                            <i class="bi bi-layers"></i>
+                        </div>
+                        <div class="floor-preview-map">
+                            <div class="preview-wing left">
+                                <div class="preview-room class">VY401</div>
+                                <div class="preview-room class">VY402</div>
+                                <div class="preview-room class">VY403</div>
+                                <div class="preview-room class">VY404</div>
+                            </div>
+                            <div class="preview-center">
+                                <div class="preview-room lab">VY426</div>
+                                <div class="preview-room lab">VY427</div>
+                                <div class="preview-room lab">VY428</div>
+                                <div class="preview-room lab">VY429</div>
+                            </div>
+                            <div class="preview-wing right">
+                                <div class="preview-room class">VY414</div>
+                                <div class="preview-room class">VY413</div>
+                                <div class="preview-room washroom">WC</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="feature-card slide-up" style="animation-delay: 0.1s;">
+                        <i class="bi bi-qr-code-scan feature-icon"></i>
+                        <h4>QR Code Access</h4>
+                        <p>Scan room QR codes to report instantly</p>
+                    </div>
+                    <div class="feature-card slide-up" style="animation-delay: 0.2s;">
+                        <i class="bi bi-lightning-charge feature-icon"></i>
+                        <h4>Quick Response</h4>
+                        <p>Track your report status in real-time</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="features-section py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center mb-5 fade-in">
+                <h2 class="section-title">How It Works</h2>
+                <p class="section-subtitle">Three simple steps to report maintenance issues</p>
+            </div>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-4 fade-in" style="animation-delay: 0.1s;">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <i class="bi bi-layers step-icon"></i>
+                    <h4>Select Floor</h4>
+                    <p>Choose your floor from the dropdown or let QR code auto-select it</p>
+                </div>
+            </div>
+            <div class="col-md-4 fade-in" style="animation-delay: 0.2s;">
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <i class="bi bi-hand-index-thumb step-icon"></i>
+                    <h4>Tap Your Room</h4>
+                    <p>Click on your room in the interactive floor map</p>
+                </div>
+            </div>
+            <div class="col-md-4 fade-in" style="animation-delay: 0.3s;">
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <i class="bi bi-send-check step-icon"></i>
+                    <h4>Submit Report</h4>
+                    <p>Describe the issue and submit your maintenance request</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Floor Guide Section -->
+<section class="floor-guide-section py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center mb-4 fade-in">
+                <h2 class="section-title">Vyas Building Floors</h2>
+                <p class="section-subtitle">8 floors of classrooms and labs</p>
+            </div>
+        </div>
+        <div class="row g-3 justify-content-center">
+            <div class="col-6 col-md-3 col-lg-2 fade-in" style="animation-delay: 0.1s;">
+                <div class="floor-card">
+                    <span class="floor-level">7</span>
+                    <span class="floor-name">7th Floor</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2 fade-in" style="animation-delay: 0.15s;">
+                <div class="floor-card">
+                    <span class="floor-level">6</span>
+                    <span class="floor-name">6th Floor</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2 fade-in" style="animation-delay: 0.2s;">
+                <div class="floor-card">
+                    <span class="floor-level">5</span>
+                    <span class="floor-name">5th Floor</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2 fade-in" style="animation-delay: 0.25s;">
+                <div class="floor-card highlight">
+                    <span class="floor-level">4</span>
+                    <span class="floor-name">4th Floor</span>
+                    <small class="floor-note">Demo Floor</small>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2 fade-in" style="animation-delay: 0.3s;">
+                <div class="floor-card">
+                    <span class="floor-level">3</span>
+                    <span class="floor-name">3rd Floor</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2 fade-in" style="animation-delay: 0.35s;">
+                <div class="floor-card">
+                    <span class="floor-level">2</span>
+                    <span class="floor-name">2nd Floor</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2 fade-in" style="animation-delay: 0.4s;">
+                <div class="floor-card">
+                    <span class="floor-level">1</span>
+                    <span class="floor-name">1st Floor</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2 fade-in" style="animation-delay: 0.45s;">
+                <div class="floor-card">
+                    <span class="floor-level">G</span>
+                    <span class="floor-name">Ground</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Quick Links Section -->
+<section class="quick-links-section py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center mb-4 fade-in">
+                <h2 class="section-title">Quick Access</h2>
+            </div>
+        </div>
+        <div class="row g-4 justify-content-center">
+            <div class="col-md-4 col-lg-3 fade-in" style="animation-delay: 0.1s;">
+                <a href="{{ url_for('main.report_form') }}" class="quick-link-card">
+                    <i class="bi bi-plus-circle"></i>
+                    <span>Report Issue</span>
+                </a>
+            </div>
+            <div class="col-md-4 col-lg-3 fade-in" style="animation-delay: 0.2s;">
+                <a href="{{ url_for('admin.login') }}" class="quick-link-card">
+                    <i class="bi bi-shield-lock"></i>
+                    <span>Admin Portal</span>
+                </a>
+            </div>
+            <div class="col-md-4 col-lg-3 fade-in" style="animation-delay: 0.3s;">
+                <a href="{{ url_for('admin.status_map') }}" class="quick-link-card">
+                    <i class="bi bi-map"></i>
+                    <span>Status Map</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
