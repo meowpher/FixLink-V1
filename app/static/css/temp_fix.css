@@ -1,0 +1,24 @@
+.stat-content {
+    flex: 1;
+    min-width: 0;
+    /* Fix flex overflow issue */
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0;
+    line-height: 1.1;
+    /* Tighter line height */
+    color: #333;
+}
+
+.stat-label {
+    color: var(--mitwpu-gray-dark);
+    margin-bottom: 0;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    /* Prevent wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

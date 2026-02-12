@@ -11,24 +11,24 @@
                 <!-- Login Card -->
                 <div class="login-card slide-up">
                     <div class="login-header text-center">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/8/87/MIT_-_WPU_Logo.webp" 
-                             alt="MIT-WPU Logo" 
-                             class="login-logo mb-3">
+                        <img src="{{ url_for('static', filename='images/MIT-logo.jpeg') }}" alt="MIT-WPU Logo"
+                            class="login-logo mb-3">
                         <h3 class="login-title">Admin Login</h3>
                         <p class="login-subtitle">Vyas Building Maintenance Dashboard</p>
                     </div>
 
                     <!-- Flash Messages -->
                     {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                                    {{ message }}
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                                </div>
-                            {% endfor %}
-                        {% endif %}
+                    {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show"
+                        role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
                     {% endwith %}
 
                     <!-- Login Form -->
@@ -39,8 +39,8 @@
                                 <span class="input-group-text">
                                     <i class="bi bi-person"></i>
                                 </span>
-                                <input type="text" class="form-control" id="username" name="username" 
-                                       placeholder="Enter username" required autofocus>
+                                <input type="text" class="form-control" id="username" name="username"
+                                    placeholder="Enter username" required autofocus>
                             </div>
                         </div>
                         <div class="mb-4">
@@ -49,8 +49,8 @@
                                 <span class="input-group-text">
                                     <i class="bi bi-lock"></i>
                                 </span>
-                                <input type="password" class="form-control" id="password" name="password" 
-                                       placeholder="Enter password" required>
+                                <input type="password" class="form-control" id="password" name="password"
+                                    placeholder="Enter password" required>
                                 <button class="btn btn-outline-secondary" type="button" id="togglePassword">
                                     <i class="bi bi-eye"></i>
                                 </button>
@@ -86,10 +86,10 @@
 {% block extra_js %}
 <script>
     // Password visibility toggle
-    document.getElementById('togglePassword').addEventListener('click', function() {
+    document.getElementById('togglePassword').addEventListener('click', function () {
         const passwordInput = document.getElementById('password');
         const icon = this.querySelector('i');
-        
+
         if (passwordInput.type === 'password') {
             passwordInput.type = 'text';
             icon.classList.remove('bi-eye');

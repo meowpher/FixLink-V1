@@ -75,7 +75,7 @@ body {
 .mitwpu-logo {
     height: 45px;
     width: auto;
-    filter: brightness(0) invert(1);
+    border-radius: 4px;
 }
 
 .brand-text-wrapper {
@@ -995,7 +995,7 @@ body {
 
 .form-logo {
     height: 50px;
-    filter: brightness(0) invert(1);
+    border-radius: 4px;
     margin-bottom: 0.5rem;
 }
 
@@ -1146,6 +1146,7 @@ body {
     align-items: center;
     box-shadow: var(--shadow-md);
     transition: all var(--transition-normal);
+    height: 100%;
 }
 
 .stat-card:hover {
@@ -1184,10 +1185,16 @@ body {
     color: var(--success-color);
 }
 
+.stat-content {
+    flex: 1;
+    min-width: 0;
+}
+
 .stat-number {
     font-size: 2rem;
     font-weight: 700;
     margin-bottom: 0;
+    line-height: 1.1;
     color: #333;
 }
 
@@ -1195,6 +1202,9 @@ body {
     color: var(--mitwpu-gray-dark);
     margin-bottom: 0;
     font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Filters & Tickets Table */

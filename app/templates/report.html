@@ -89,8 +89,8 @@
             <div class="col-lg-5 col-xl-4">
                 <div class="form-panel slide-up" style="animation-delay: 0.1s;">
                     <div class="form-header">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/8/87/MIT_-_WPU_Logo.webp"
-                            alt="MIT-WPU Logo" class="form-logo">
+                        <img src="{{ url_for('static', filename='images/MIT-logo.jpeg') }}" alt="MIT-WPU Logo"
+                            class="form-logo">
                         <h4 class="form-title">Report Issue</h4>
                         {% if room_param %}
                         <div class="room-detected-badge">
