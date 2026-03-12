@@ -3,10 +3,12 @@ Main Routes Blueprint - Student Portal and API Endpoints
 """
 import os
 from datetime import datetime
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, render_template, request, jsonify, current_app, session, redirect, url_for
 from werkzeug.utils import secure_filename
 from . import db
-from .models import Building, Floor, Room, Asset, Ticket
+from .models import Building, Floor, Room, Asset, Ticket, User
+from .email_utils import send_ticket_email
+from .auth_routes import user_login_required
 
 main_bp = Blueprint('main', __name__)
 
@@ -21,11 +23,12 @@ def allowed_file(filename):
 
 @main_bp.route('/')
 def index():
-    """Landing page with links to portals."""
-    return render_template('index.html')
+    """Redirect to login page."""
+    return redirect(url_for('auth.login'))
 
 
 @main_bp.route('/report', methods=['GET'])
+@user_login_required
 def report_form():
     """
     Student portal - report room issues with visual map.
@@ -68,10 +71,16 @@ def report_form():
         ('lighting', 'Lighting'),
         ('computer', 'Computer/Lab Equipment'),
         ('cleaning', 'Cleaning Required'),
+        ('lift_breakdown', 'Lift Not Working'),
+        ('door_error', 'Door Error'),
+        ('light_broken', 'Light/Fan Broken'),
         ('other', 'Other')
     ]
     
+    user = User.query.get(session['user_id'])
+    
     return render_template('report.html',
+                         user=user,
                          building=building,
                          floors=floors,
                          issue_types=issue_types,
@@ -82,15 +91,17 @@ def report_form():
 
 
 @main_bp.route('/report', methods=['POST'])
+@user_login_required
 def submit_report():
     """
     Submit a new maintenance ticket.
     Handles both AJAX and form submissions.
     """
-    # Get form data
-    reporter_name = request.form.get('reporter_name', '').strip()
-    prn = request.form.get('prn', '').strip()
-    reporter_email = request.form.get('reporter_email', '').strip()
+    user = User.query.get(session['user_id'])
+    reporter_name = user.name
+    prn = user.prn or 'Admin'
+    reporter_email = user.email
+
     room_id = request.form.get('room_id')
     asset_id = request.form.get('asset_id')
     issue_type = request.form.get('issue_type', '').strip()
@@ -98,19 +109,6 @@ def submit_report():
     
     # Server-side validation
     errors = []
-    
-    if not reporter_name:
-        errors.append('Name is required')
-    
-    if not prn:
-        errors.append('PRN is required')
-    elif not prn.isdigit():
-        errors.append('PRN must be numeric')
-    
-    if not reporter_email:
-        errors.append('Email is required')
-    elif not reporter_email.lower().endswith('@mitwpu.edu.in'):
-        errors.append('Please use your official College Email')
     
     if not room_id:
         errors.append('Room is required')
@@ -147,6 +145,7 @@ def submit_report():
             issue_type=issue_type,
             description=description,
             image_filename=image_filename,
+            reporter_id=user.id,
             reporter_name=reporter_name,
             prn=prn,
             reporter_email=reporter_email.lower(),
@@ -162,6 +161,9 @@ def submit_report():
                 asset.status = Asset.STATUS_BROKEN
         
         db.session.commit()
+        
+        # Trigger EmailJS notification for ticket creation
+        send_ticket_email(ticket, action='created')
         
         # Return JSON for AJAX, redirect for form submission
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -244,4 +246,22 @@ def get_buildings():
     return jsonify({
         'success': True,
         'buildings': [building.to_dict() for building in buildings]
+    })
+
+
+@main_bp.route('/api/me')
+@user_login_required
+def get_me():
+    """Return current user's profile info for the navbar avatar."""
+    user = User.query.get(session['user_id'])
+    photo_url = (
+        url_for('static', filename=f'uploads/{user.profile_photo}')
+        if user and user.profile_photo else None
+    )
+    return jsonify({
+        'success': True,
+        'name': user.name if user else '',
+        'email': user.email if user else '',
+        'prn': user.prn or 'Admin' if user else '',
+        'photo_url': photo_url
     })

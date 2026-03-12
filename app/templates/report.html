@@ -46,10 +46,11 @@
                             <select class="form-select form-select-sm" id="floorSelect" style="width: auto;">
                                 <option value="">Select Floor</option>
                                 {% for floor in floors %}
-                                <option value="{{ floor.id }}" data-level="{{ floor.level }}" {% if
-                                    selected_floor==floor.id %}selected{% endif %}>
+                                {% if floor.level != 6 %}
+                                <option value="{{ floor.id }}" data-level="{{ floor.level }}" {% if selected_floor==floor.id %}selected{% endif %}>
                                     {{ floor.name }}
                                 </option>
+                                {% endif %}
                                 {% endfor %}
                             </select>
                         </div>
@@ -66,6 +67,10 @@
                     <!-- Map Legend -->
                     <div class="map-legend">
                         <span class="legend-item">
+                            <span class="legend-color lift"></span>
+                            <span>Lifts</span>
+                        </span>
+                        <span class="legend-item">
                             <span class="legend-color class"></span>
                             <span>Classroom</span>
                         </span>
@@ -78,8 +83,8 @@
                             <span>Washroom</span>
                         </span>
                         <span class="legend-item">
-                            <span class="legend-color selected"></span>
-                            <span>Selected</span>
+                            <span class="legend-color faculty"></span>
+                            <span>Faculty Rooms</span>
                         </span>
                     </div>
                 </div>
@@ -89,7 +94,7 @@
             <div class="col-lg-5 col-xl-4">
                 <div class="form-panel slide-up" style="animation-delay: 0.1s;">
                     <div class="form-header">
-                        <img src="{{ url_for('static', filename='images/MIT-logo.jpeg') }}" alt="MIT-WPU Logo"
+                        <img src="{{ url_for('static', filename='images/logo-lm.png') }}" alt="MIT-WPU Logo"
                             class="form-logo">
                         <h4 class="form-title">Report Issue</h4>
                         {% if room_param %}
@@ -119,29 +124,6 @@
                             </div>
                         </div>
 
-                        <!-- Reporter Info -->
-                        <div class="form-section">
-                            <h6 class="form-section-title">
-                                <i class="bi bi-person me-1"></i>Your Information
-                            </h6>
-                            <div class="mb-3">
-                                <label for="reporter_name" class="form-label">Full Name *</label>
-                                <input type="text" class="form-control" id="reporter_name" name="reporter_name"
-                                    placeholder="Enter your full name" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="prn" class="form-label">PRN *</label>
-                                <input type="text" class="form-control" id="prn" name="prn"
-                                    placeholder="Enter your PRN number" required>
-                                <div class="invalid-feedback">PRN must be numeric</div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="reporter_email" class="form-label">Email Address *</label>
-                                <input type="email" class="form-control" id="reporter_email" name="reporter_email"
-                                    placeholder="yourname@mitwpu.edu.in" required>
-                                <div class="invalid-feedback">Please use your official College Email</div>
-                            </div>
-                        </div>
 
                         <!-- Issue Details -->
                         <div class="form-section">

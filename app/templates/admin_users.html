@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+{% block title %}User Management - MIT-WPU FixLink{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="admin-header vyas-admin-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-7">
+                <h1 class="admin-title">
+                    <i class="bi bi-people me-2"></i>User Management
+                </h1>
+                <p class="admin-subtitle">{{ total }} user{{ 's' if total != 1 }} in the database</p>
+            </div>
+            <div class="col-md-5 text-md-end">
+                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-light">
+                    <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Search & Filter Bar -->
+<section class="py-4" style="background:#f8fafc; border-bottom: 1px solid #e9ecef;">
+    <div class="container">
+        <form method="GET" action="{{ url_for('admin.users') }}" id="filterForm">
+            <div class="row g-3 align-items-end">
+                <!-- Search -->
+                <div class="col-md-5">
+                    <label class="form-label fw-semibold text-muted small text-uppercase">Search</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" name="q" class="form-control"
+                               placeholder="Name, PRN, or email…"
+                               value="{{ search_query }}">
+                    </div>
+                </div>
+                <!-- Role Filter -->
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold text-muted small text-uppercase">Role</label>
+                    <select name="role" class="form-select" onchange="this.form.submit()">
+                        <option value="all" {% if role_filter == 'all' %}selected{% endif %}>All Roles</option>
+                        <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Admin</option>
+                        <option value="reporter" {% if role_filter == 'reporter' %}selected{% endif %}>Reporter</option>
+                    </select>
+                </div>
+                <!-- Status Filter -->
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold text-muted small text-uppercase">Status</label>
+                    <select name="status" class="form-select" onchange="this.form.submit()">
+                        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                        <option value="verified" {% if status_filter == 'verified' %}selected{% endif %}>Verified</option>
+                        <option value="unverified" {% if status_filter == 'unverified' %}selected{% endif %}>Unverified</option>
+                    </select>
+                </div>
+                <!-- Sort -->
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold text-muted small text-uppercase">Sort By</label>
+                    <select name="sort" class="form-select" onchange="this.form.submit()">
+                        <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Newest</option>
+                        <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Oldest</option>
+                        <option value="name" {% if sort == 'name' %}selected{% endif %}>Name A–Z</option>
+                    </select>
+                </div>
+                <!-- Buttons -->
+                <div class="col-md-1 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i></button>
+                    <a href="{{ url_for('admin.users') }}" class="btn btn-outline-secondary" title="Clear filters"><i class="bi bi-x-lg"></i></a>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+
+<!-- User Table -->
+<section class="py-4">
+    <div class="container">
+        <div class="card border-0 shadow-sm" style="border-radius: 14px; overflow: hidden;">
+            {% if users %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="usersTable">
+                    <thead style="background:#f1f5f9;">
+                        <tr>
+                            <th class="px-4 py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; color:#64748b; font-weight:700;">#</th>
+                            <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; color:#64748b; font-weight:700;">User</th>
+                            <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; color:#64748b; font-weight:700;">PRN</th>
+                            <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; color:#64748b; font-weight:700;">Role</th>
+                            <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; color:#64748b; font-weight:700;">Status</th>
+                            <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; color:#64748b; font-weight:700;">Tickets</th>
+                            <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; color:#64748b; font-weight:700;">Joined</th>
+                            <th class="py-3 text-end pe-4" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; color:#64748b; font-weight:700;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr id="user-row-{{ user.id }}">
+                            <td class="px-4 text-muted small">{{ loop.index + (page - 1) * per_page }}</td>
+                            <td>
+                                <!-- Avatar + name/email -->
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="user-table-avatar">
+                                        {% if user.profile_photo %}
+                                        <img src="{{ url_for('static', filename='uploads/' + user.profile_photo) }}" alt="{{ user.name }}" class="nav-avatar-img">
+                                        {% else %}
+                                        {{ (user.name.split()[0][0] + user.name.split()[-1][0]).upper() if user.name and ' ' in user.name else user.name[0].upper() if user.name else '?' }}
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <div class="fw-semibold" style="font-size:0.9rem;">{{ user.name }}</div>
+                                        <div class="text-muted small">{{ user.email }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-muted small font-monospace">{{ user.prn or '—' }}</td>
+                            <td>
+                                {% if user.is_admin %}
+                                <span class="badge bg-primary-subtle text-primary">Admin</span>
+                                {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary">Reporter</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.is_verified %}
+                                <span class="badge bg-success-subtle text-success"><i class="bi bi-check-circle me-1"></i>Verified</span>
+                                {% else %}
+                                <span class="badge bg-warning-subtle text-warning"><i class="bi bi-clock me-1"></i>Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="fw-semibold">{{ user.tickets|length }}</span>
+                                <span class="text-muted small">ticket{{ 's' if user.tickets|length != 1 }}</span>
+                            </td>
+                            <td class="text-muted small">{{ user.created_at.strftime('%d %b %Y') if user.created_at else '—' }}</td>
+                            <td class="text-end pe-4">
+                                <div class="d-flex gap-2 justify-content-end">
+                                    <button class="btn btn-sm btn-outline-primary edit-user-btn"
+                                            data-id="{{ user.id }}"
+                                            data-name="{{ user.name | e }}"
+                                            data-email="{{ user.email | e }}"
+                                            data-prn="{{ (user.prn or '') | e }}"
+                                            data-role="{{ 'admin' if user.is_admin else 'reporter' }}"
+                                            title="Edit user">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    {% if not user.is_admin %}
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            onclick="deleteUser({{ user.id }}, '{{ user.name }}')"
+                                            title="Delete user">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                    {% if not user.is_verified %}
+                                    <button class="btn btn-sm btn-outline-success"
+                                            onclick="verifyUser({{ user.id }})"
+                                            title="Manually verify user">
+                                        <i class="bi bi-shield-check"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if pages > 1 %}
+            <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top bg-white">
+                <span class="text-muted small">Showing {{ (page-1)*per_page + 1 }}–{{ [page*per_page, total]|min }} of {{ total }}</span>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        {% for p in range(1, pages + 1) %}
+                        <li class="page-item {% if p == page %}active{% endif %}">
+                            <a class="page-link"
+                               href="{{ url_for('admin.users', q=search_query, role=role_filter, status=status_filter, sort=sort, page=p) }}">
+                                {{ p }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-person-x display-3 mb-3"></i>
+                <p>No users found matching your filters.</p>
+                <a href="{{ url_for('admin.users') }}" class="btn btn-outline-secondary btn-sm">Clear Filters</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-2 text-primary"></i>Edit User</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="editError" class="alert alert-danger d-none"></div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+          <input type="text" id="editName" class="form-control" placeholder="Full name">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">PRN</label>
+          <input type="text" id="editPRN" class="form-control" placeholder="PRN number">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
+          <input type="email" id="editEmail" class="form-control" placeholder="user@mitwpu.edu.in">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Role</label>
+          <select id="editRole" class="form-select">
+            <option value="reporter">Reporter</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <hr>
+        <div class="mb-2">
+          <label class="form-label fw-semibold">New Password <span class="text-muted small fw-normal">(leave blank to keep current)</span></label>
+          <input type="password" id="editPassword" class="form-control" placeholder="Min 8 characters">
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="saveEditBtn">
+          <i class="bi bi-check-lg me-1"></i>Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0">
+        <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Delete User</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete <strong id="deleteUserName"></strong>? This cannot be undone.</p>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let deleteUserId = null;
+let editUserId = null;
+
+// ── Edit ────────────────────────────────────────────────
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.edit-user-btn');
+    if (!btn) return;
+    editUserId = btn.dataset.id;
+    document.getElementById('editName').value  = btn.dataset.name;
+    document.getElementById('editEmail').value = btn.dataset.email;
+    document.getElementById('editPRN').value   = btn.dataset.prn;
+    document.getElementById('editRole').value  = btn.dataset.role;
+    document.getElementById('editPassword').value = '';
+    document.getElementById('editError').classList.add('d-none');
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+});
+
+document.getElementById('saveEditBtn').addEventListener('click', () => {
+    if (!editUserId) return;
+    const errEl = document.getElementById('editError');
+    errEl.classList.add('d-none');
+
+    const payload = {
+        name:     document.getElementById('editName').value.trim(),
+        email:    document.getElementById('editEmail').value.trim(),
+        prn:      document.getElementById('editPRN').value.trim(),
+        role:     document.getElementById('editRole').value,
+        password: document.getElementById('editPassword').value
+    };
+
+    fetch(`/admin/users/${editUserId}/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+            location.reload();
+        } else {
+            errEl.textContent = data.error;
+            errEl.classList.remove('d-none');
+        }
+    });
+});
+
+// ── Delete ───────────────────────────────────────────────
+function deleteUser(id, name) {
+    deleteUserId = id;
+    document.getElementById('deleteUserName').textContent = name;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
+    if (!deleteUserId) return;
+    fetch(`/admin/users/${deleteUserId}/delete`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById(`user-row-${deleteUserId}`)?.remove();
+                bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        });
+});
+
+// ── Verify ───────────────────────────────────────────────
+function verifyUser(id) {
+    fetch(`/admin/users/${id}/verify`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) location.reload();
+            else alert('Error: ' + data.error);
+        });
+}
+</script>
+
+<style>
+.user-table-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--mitwpu-blue);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+</style>
+{% endblock %}

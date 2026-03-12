@@ -2,8 +2,38 @@
 SQLAlchemy Models for MIT-WPU Vyas Smart-Room Tracker
 """
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 from . import db
 
+
+class User(db.Model):
+    """User model - unified auth for admins and reporters."""
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    prn = db.Column(db.String(20), nullable=True)
+    email = db.Column(db.String(120), nullable=False, unique=True)
+    password_hash = db.Column(db.String(255), nullable=True)
+    is_admin = db.Column(db.Boolean, default=False)
+    is_verified = db.Column(db.Boolean, default=False)
+    verification_token = db.Column(db.String(100), nullable=True)
+    profile_photo = db.Column(db.String(255), nullable=True)  # uploaded avatar filename
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    tickets = db.relationship('Ticket', backref='reporter', lazy=True)
+    
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+        
+    def check_password(self, password):
+        if not self.password_hash:
+            return False
+        return check_password_hash(self.password_hash, password)
+        
+    def __repr__(self):
+        return f'<User {self.email}>'
 
 class Building(db.Model):
     """Building model - Vyas building."""
@@ -97,19 +127,31 @@ class Room(db.Model):
     
     @property
     def has_open_tickets(self):
-        """Check if room has any open or in-progress tickets."""
-        return any(t.status in [Ticket.STATUS_OPEN, Ticket.STATUS_IN_PROGRESS] for t in self.tickets)
+        """Check if room has any OPEN tickets (Red status)."""
+        return any(t.status == Ticket.STATUS_OPEN for t in self.tickets)
+    
+    @property
+    def has_in_progress_tickets(self):
+        """Check if room has any IN_PROGRESS tickets (Yellow status)."""
+        return any(t.status == Ticket.STATUS_IN_PROGRESS for t in self.tickets)
     
     @property
     def has_broken_assets(self):
         """Check if room has any broken assets."""
         return any(a.status == Asset.STATUS_BROKEN for a in self.assets)
-    
+        
     @property
     def status(self):
-        """Get room status based on tickets and assets."""
+        """
+        Return room status:
+        - 'issue': Has OPEN tickets (Red)
+        - 'in-progress': Has IN_PROGRESS tickets but NO open tickets (Yellow)
+        - 'normal': No open or in-progress tickets (Green)
+        """
         if self.has_open_tickets or self.has_broken_assets:
             return 'issue'
+        elif self.has_in_progress_tickets:
+            return 'in-progress'
         return 'normal'
 
 
@@ -165,6 +207,7 @@ class Ticket(db.Model):
     image_filename = db.Column(db.String(255), nullable=True)
     
     # Reporter info
+    reporter_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     reporter_name = db.Column(db.String(100), nullable=False)
     prn = db.Column(db.String(20), nullable=False)
     reporter_email = db.Column(db.String(120), nullable=False)

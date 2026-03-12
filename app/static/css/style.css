@@ -57,6 +57,7 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    padding-top: 90px;
 }
 
 .main-content {
@@ -67,9 +68,93 @@ body {
    NAVIGATION
    ============================================ */
 .vyas-navbar {
-    background: linear-gradient(135deg, var(--mitwpu-blue) 0%, var(--mitwpu-blue-dark) 100%);
-    box-shadow: var(--shadow-md);
-    padding: 0.75rem 0;
+    background: #ffffff;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.10);
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #e9ecef;
+    position: fixed;
+    top: 12px;
+    left: 16px;
+    right: 16px;
+    border-radius: 14px;
+    z-index: 1030;
+}
+
+/* Profile Avatar */
+.nav-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--mitwpu-blue);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    overflow: hidden;
+    border: 2px solid #e2e8f0;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    flex-shrink: 0;
+}
+
+.nav-avatar:hover {
+    border-color: var(--mitwpu-blue);
+    box-shadow: 0 0 0 3px rgba(0, 60, 136, 0.15);
+}
+
+.nav-avatar-sm {
+    width: 32px;
+    height: 32px;
+    font-size: 0.75rem;
+}
+
+.nav-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-dropdown {
+    min-width: 290px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border: 1px solid #e9ecef;
+    padding: 0;
+    overflow: hidden;
+}
+
+.profile-dropdown .dropdown-header-item {
+    background: #f8fafc;
+}
+
+.profile-dropdown .dropdown-item {
+    padding: 0.6rem 1rem;
+    font-size: 0.875rem;
+}
+
+.profile-info-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.profile-info-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    min-width: 36px;
+}
+
+.profile-info-value {
+    font-size: 0.8rem;
+    color: #334155;
+    font-weight: 500;
+    word-break: break-all;
 }
 
 .mitwpu-logo {
@@ -87,26 +172,27 @@ body {
 .brand-text {
     font-weight: 700;
     font-size: 1.25rem;
-    color: var(--mitwpu-white);
+    color: var(--mitwpu-blue-dark);
 }
 
 .brand-subtitle {
     font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.8);
-    font-weight: 400;
+    color: var(--mitwpu-gray-dark);
+    font-weight: 500;
 }
 
 .navbar-nav .nav-link {
-    color: rgba(255, 255, 255, 0.9) !important;
+    color: #495057 !important;
     font-weight: 500;
     padding: 0.5rem 1rem;
     border-radius: var(--border-radius-sm);
     transition: all var(--transition-fast);
 }
 
-.navbar-nav .nav-link:hover {
-    background-color: rgba(255, 255, 255, 0.15);
-    color: var(--mitwpu-white) !important;
+.navbar-nav .nav-link:hover,
+.navbar-nav .nav-link.active {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--mitwpu-blue) !important;
 }
 
 /* ============================================
@@ -167,6 +253,8 @@ body {
     animation: slideUp 0.6s ease forwards;
     opacity: 0;
 }
+
+
 
 /* ============================================
    SUCCESS CHECKMARK ANIMATION
@@ -638,15 +726,7 @@ body {
     font-size: 1.1rem;
 }
 
-/* ============================================
-   FOOTER
-   ============================================ */
-.footer {
-    background: var(--mitwpu-blue-dark);
-    color: rgba(255, 255, 255, 0.8);
-    padding: 1.5rem 0;
-    font-size: 0.9rem;
-}
+
 
 /* ============================================
    REPORT PAGE - MAP PANEL
@@ -663,6 +743,8 @@ body {
     overflow: hidden;
     height: 100%;
     min-height: 600px;
+    display: flex;
+    flex-direction: column;
 }
 
 .map-header {
@@ -688,9 +770,84 @@ body {
     align-items: center;
 }
 
+/* Floor Navigator Widget */
+.floor-navigator {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 10px 20px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    min-width: 200px;
+}
+
+.floor-nav-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    color: #94a3b8;
+    text-transform: uppercase;
+}
+
+.floor-nav-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.floor-nav-arrow {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    border: 2px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.18s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.floor-nav-arrow:hover {
+    background: var(--mitwpu-blue);
+    border-color: var(--mitwpu-blue);
+    color: #ffffff;
+    transform: scale(1.08);
+    box-shadow: 0 4px 12px rgba(0, 60, 136, 0.2);
+}
+
+.floor-nav-arrow:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.floor-nav-display {
+    width: 70px;
+    height: 70px;
+    border-radius: 14px;
+    border: 2.5px solid #cbd5e1;
+    background: #ffffff;
+    color: var(--mitwpu-blue-dark);
+    font-size: 1.8rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: all 0.2s ease;
+}
+
 .floor-map-container {
     padding: 1.5rem;
     min-height: 450px;
+    flex-grow: 1;
 }
 
 .floor-map-placeholder {
@@ -744,17 +901,51 @@ body {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-/* Colors */
-.fill-blue {
-    fill: var(--mitwpu-blue);
+/* Map Room Colors - Updated for Reference */
+.room-poly.fill-silver {
+    fill: #bdc3c7;
 }
 
-.fill-teal {
-    fill: var(--lab-teal);
+/* Management */
+.room-poly.fill-orange {
+    fill: #f39c12;
 }
 
-.fill-red {
-    fill: var(--mitwpu-red);
+/* Faculty */
+.room-poly.fill-red {
+    fill: #c0392b;
+}
+
+/* Washrooms */
+.room-poly.fill-blue {
+    fill: #0d47a1;
+    color: white;
+}
+
+/* Classrooms */
+.room-poly.fill-teal {
+    fill: #26a69a;
+    color: white;
+}
+
+/* Lifts */
+.room-poly.fill-pink {
+    fill: #FF69B4;
+    color: white;
+}
+
+/* Labs */
+
+.room-poly {
+    fill: #ecf0f1;
+    stroke: #7f8c8d;
+    stroke-width: 1;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.room-poly:hover {
+    fill-opacity: 0.8;
 }
 
 /* Hover Effects */
@@ -768,10 +959,10 @@ body {
 
 /* Selected State */
 .room-group.selected .room-poly {
-    stroke: #ffc107;
-    /* Warning yellow */
-    stroke-width: 4px;
-    filter: drop-shadow(0 0 8px rgba(255, 193, 7, 0.6));
+    fill: #27ae60 !important;
+    stroke: #2c3e50;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 5px rgba(39, 174, 96, 0.5));
     z-index: 10;
 }
 
@@ -779,12 +970,12 @@ body {
     font-weight: 800;
 }
 
-/* Issue State */
-.room-poly.has-issue {
-    stroke: var(--danger-color);
-    stroke-dasharray: 5, 5;
-    stroke-width: 3px;
-    animation: svgPulse 2s infinite;
+
+.building-outline {
+    fill: #dfe6e9;
+    stroke: #b2bec3;
+    stroke-width: 2;
+    transition: all 0.3s ease;
 }
 
 @keyframes svgPulse {
@@ -875,9 +1066,6 @@ body {
     outline-offset: 2px;
 }
 
-.room-block.has-issue {
-    animation: roomPulse 2s infinite;
-}
 
 .room-block.classroom,
 .room-block.class {
@@ -971,8 +1159,23 @@ body {
     background: var(--mitwpu-red);
 }
 
-.legend-color.selected {
-    background: #ffc107;
+.legend-color.faculty {
+    background: #f39c12;
+}
+
+.legend-color.lift {
+    background: #FF69B4;
+}
+
+/* ============================================
+   TICKETS TABLE
+   ============================================ */
+.tickets-table th {
+    background: var(--mitwpu-white);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    height: 100%;
 }
 
 /* ============================================
@@ -988,9 +1191,10 @@ body {
 
 .form-header {
     padding: 1.5rem;
-    background: linear-gradient(135deg, var(--mitwpu-blue) 0%, var(--mitwpu-blue-dark) 100%);
-    color: var(--mitwpu-white);
+    background: #ffffff;
+    color: var(--mitwpu-blue-dark);
     text-align: center;
+    border-bottom: 1px solid #e9ecef;
 }
 
 .form-logo {
@@ -1611,4 +1815,12 @@ body {
     fill: #fd7e14;
     stroke: #e8590c;
     stroke-width: 1px;
+}
+
+/* Selected state override */
+.room-poly.selected, 
+.room-group.selected rect {
+    stroke: #0d6efd !important;
+    stroke-width: 3px !important;
+    filter: drop-shadow(0 0 5px rgba(13, 110, 253, 0.5));
 }

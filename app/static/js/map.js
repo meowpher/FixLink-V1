@@ -12,6 +12,12 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeValidation();
 });
 
+// Building Outline Path (Approximation of Vyas Building)
+const BUILDING_OUTLINE_PATH = `
+    <path d="M20 100 L120 20 L480 20 L480 780 L20 780 Z" 
+          class="building-outline" />
+`;
+
 // ============================================
 // FLOOR MAP INITIALIZATION
 // ============================================
@@ -120,7 +126,13 @@ function renderFloorMap(container, rooms, floorLevel) {
 // ============================================
 // RENDER GROUND FLOOR
 // ============================================
-function renderGroundFloor(container, rooms) {
+// ============================================
+// RENDER GROUND FLOOR
+// ============================================
+// ============================================
+// RENDER GROUND FLOOR
+// ============================================
+function renderGroundFloor(container, rooms, isAdmin = false) {
     const findRoom = (num) => rooms.find(r => r.number === num);
 
     const renderRoomRect = (roomNum, x, y, w, h, labelText, typeOverride) => {
@@ -128,34 +140,57 @@ function renderGroundFloor(container, rooms) {
         const roomId = room ? room.id : '';
         const type = typeOverride || (room ? room.room_type : 'unknown');
         const isIssue = room && room.status === 'issue';
+        const isInProgress = room && room.status === 'in-progress';
 
         let className = 'room-poly';
 
-        // Color mapping based on type
+        // Color mapping
         if (type === 'management') className += ' fill-silver';
         else if (type === 'faculty') className += ' fill-orange';
         else if (type === 'lab' || type === 'breakout') className += ' fill-red';
         else if (type === 'class') className += ' fill-blue';
         else if (type === 'washroom') className += ' fill-red';
+        else if (type === 'lift') className += ' fill-pink';
 
         if (isIssue) className += ' has-issue';
+        else if (isInProgress) className += ' in-progress';
 
-        // Accessibility/Interaction attributes
         const attrs = room ?
             `data-room="${roomNum}" data-room-id="${roomId}" onclick="selectRoom('${roomNum}', ${roomId})"` :
             'class="room-disabled"';
 
+        let circleHtml = '';
+        if (isAdmin) {
+            const radius = 6;
+            const padding = 4;
+            const cx = x + w - radius - padding;
+            const cy = y + radius + padding;
+            
+            let circleFill = '#28a745'; // normal (green)
+            if (isIssue) circleFill = '#dc3545'; // issue reported (red)
+            else if (isInProgress) circleFill = '#ffc107'; // in progress (yellow)
+            
+            circleHtml = `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${circleFill}" stroke="white" stroke-width="1.5" />`;
+        }
+
         return `
             <g class="room-group" ${attrs}>
                 <rect x="${x}" y="${y}" width="${w}" height="${h}" class="${className}" rx="4" />
-                <text x="${x + w / 2}" y="${y + h / 2}" class="room-text" text-anchor="middle" dominant-baseline="middle">${labelText || roomNum}</text>
+                <text x="${x + w / 2}" y="${y + h / 2}" class="room-text" text-anchor="middle" dominant-baseline="middle" fill="white">${labelText || roomNum}</text>
+                ${circleHtml}
             </g>
         `;
     };
 
-    // ViewBox 0 0 500 800
+    // V5 Layout applied to Ground Floor
+    // Outline: Perfect Outline with Top Overlap Fix
+    const SVG_OUTLINE = `
+        <path d="M50 10 L480 350 L480 950 L50 950 Z" 
+              class="building-outline" />
+    `;
+
     const svgContent = `
-        <svg viewBox="0 0 500 800" width="100%" height="100%" class="interactive-map">
+        <svg viewBox="0 0 530 980" width="100%" height="100%" class="interactive-map">
             <defs>
                 <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
                     <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
@@ -166,41 +201,73 @@ function renderGroundFloor(container, rooms) {
                 </filter>
             </defs>
             
-            <!-- CORRIDOR / BACKGROUND STRUCTURE -->
-            <path d="M120 0 L120 800 M340 230 L340 800" stroke="#e9ecef" stroke-width="2" fill="none" />
+            ${SVG_OUTLINE}
 
-            <!-- LEFT COLUMN -->
-            ${renderRoomRect('VY001', 20, 20, 100, 100, '001', 'management')}
-            ${renderRoomRect('VY002', 20, 130, 100, 100)}
+            <!-- LEFT COLUMN (x=60, w=100) -->
+            <!-- Top Lifts (3) -->
+            ${renderRoomRect('VY0Lift1', 60, 50, 30, 25, 'L', 'lift')}
+            ${renderRoomRect('VY0Lift2', 60, 80, 30, 25, 'L', 'lift')}
+            ${renderRoomRect('VY0Lift3', 60, 110, 30, 25, 'L', 'lift')}
+
+            <!-- VY001 (Blue) -->
+            ${renderRoomRect('VY001', 60, 150, 100, 120, 'VY001', 'class')}
             
-            <!-- Entrance Gap -->
+            <!-- VY002 (Blue) -->
+            ${renderRoomRect('VY002', 60, 280, 100, 120, null, 'class')}
+
+            <!-- Middle Lifts (2) -->
+            ${renderRoomRect('VY0Lift4', 60, 410, 30, 25, 'L', 'lift')}
+            ${renderRoomRect('VY0Lift5', 60, 440, 30, 25, 'L', 'lift')}
+
+            <!-- LOWER BLOCK START (y=500) -->
             
-            ${renderRoomRect('VY003', 20, 350, 100, 100)}
-            ${renderRoomRect('VY004', 20, 460, 100, 100)}
+            <!-- VY003 (Blue) -->
+            ${renderRoomRect('VY003', 60, 500, 100, 140, null, 'class')}
 
-            <!-- TOP CENTER SECTION -->
-            ${renderRoomRect('VY024', 140, 20, 100, 100, '024', 'management')}
-            ${renderRoomRect('VY026', 140, 130, 100, 80, '026', 'faculty')}
+            <!-- VY004 (Blue) -->
+            ${renderRoomRect('VY004', 60, 650, 100, 140, null, 'class')}
 
-            <!-- CENTER BLOCK -->
-            ${renderRoomRect('VY027', 140, 250, 180, 80, '027', 'management')}
-            ${renderRoomRect('VY028', 140, 340, 180, 60)}
-            ${renderRoomRect('VY029', 140, 410, 180, 60)}
-            ${renderRoomRect('VY030', 140, 480, 180, 60)}
+            <!-- Bottom Lifts (3) -->
+            ${renderRoomRect('VY0Lift6', 60, 800, 30, 25, 'L', 'lift')}
+            ${renderRoomRect('VY0Lift7', 60, 830, 30, 25, 'L', 'lift')}
+            ${renderRoomRect('VY0Lift8', 60, 860, 30, 25, 'L', 'lift')}
 
-            <!-- RIGHT COLUMN -->
-            ${renderRoomRect('VY016', 340, 250, 90, 100)}
-            ${renderRoomRect('VY015', 340, 360, 90, 100)}
-            ${renderRoomRect('VY014', 340, 480, 90, 80, '014', 'lab')}
 
-            <!-- BOTTOM AREA -->
-            ${renderRoomRect('VY007', 250, 600, 100, 80, 'Breakout\nArea', 'breakout')}
+            <!-- CENTER COLUMN -->
+            <!-- VY024 (Tall Blue) -->
+            ${renderRoomRect('VY024', 170, 190, 100, 160, 'VY024', 'class')}
+
+            <!-- VY026 (Faculty) - Tucked Slot -->
+            ${renderRoomRect('VY026', 280, 290, 80, 100, 'VY026', 'faculty')} 
+
+            <!-- LAB STACK -->
+            <!-- VY027 -->
+            ${renderRoomRect('VY027', 170, 500, 180, 65, 'VY027', 'lab')}
+            <!-- VY028 -->
+            ${renderRoomRect('VY028', 170, 575, 180, 65, 'VY028', 'lab')}
+            <!-- VY029 -->
+            ${renderRoomRect('VY029', 170, 650, 180, 65, 'VY029', 'lab')}
+            <!-- VY030 -->
+            ${renderRoomRect('VY030', 170, 725, 180, 65, 'VY030', 'lab')}
+
+
+            <!-- RIGHT COLUMN (x=380) -->
+            <!-- Service Stack Top (Using empty washroom slots for visual consistency) -->
+            ${renderRoomRect('WR1', 380, 370, 90, 22, '', 'washroom')}
+            ${renderRoomRect('WR2', 380, 400, 90, 22, '', 'washroom')}
+            ${renderRoomRect('WR3', 380, 430, 90, 22, '', 'washroom')}
+            ${renderRoomRect('WR4', 380, 460, 90, 22, '', 'washroom')}
+
+            <!-- VY016 (Class) - Slot 14 pos -->
+            ${renderRoomRect('VY016', 380, 500, 90, 140, null, 'class')}
+
+            <!-- VY015 (Class) - Slot 13 pos -->
+            ${renderRoomRect('VY015', 380, 650, 90, 140, null, 'class')}
+
+            <!-- VY014 (Lab) - Lower slot or separate? Let's put in Bottom Washroom area or just below -->
+            <!-- Putting VY007 (Breakout) in bottom washroom slot -->
+            ${renderRoomRect('VY007', 380, 800, 90, 55, 'Rest', 'breakout')}
             
-            <!-- You Here Indicator -->
-            <g transform="translate(80, 280)">
-                 <path d="M0 0 L10 -5 L10 5 Z" fill="#c8102e" />
-                 <text x="15" y="4" font-size="12" fill="#333">You Are Here</text>
-            </g>
         </svg>
     `;
 
@@ -210,7 +277,7 @@ function renderGroundFloor(container, rooms) {
         </div>
     `;
 
-    // Auto-select room if pre-selected
+    // Auto-select room...
     if (typeof preSelectedRoom !== 'undefined' && preSelectedRoom) {
         const roomGroup = container.querySelector(`g[data-room-id="${preSelectedRoom}"]`);
         if (roomGroup) {
@@ -223,43 +290,77 @@ function renderGroundFloor(container, rooms) {
 // ============================================
 // RENDER DETAILED LAYOUT (SVG)
 // ============================================
-function renderDetailedLayout(container, rooms, floorLevel) {
+// ============================================
+// RENDER DETAILED LAYOUT (SVG)
+// ============================================
+function renderDetailedLayout(container, rooms, floorLevel, isAdmin = false) {
     const findRoom = (num) => rooms.find(r => r.number === num);
-
-    // Helper to generate room number from suffix (e.g., '01' -> 'VY401')
     const getRoomNum = (suffix) => `VY${floorLevel}${suffix}`;
 
-    const renderRoomRect = (suffix, x, y, w, h, labelText) => {
+    const renderRoomRect = (suffix, x, y, w, h, labelText, typeOverride) => {
         const roomNum = getRoomNum(suffix);
         const room = findRoom(roomNum);
-        // Default styling if room missing from DB
         const roomId = room ? room.id : '';
-        const type = room ? room.room_type : 'unknown';
+        const type = typeOverride || (room ? room.room_type : 'unknown');
         const isIssue = room && room.status === 'issue';
+        const isInProgress = room && room.status === 'in-progress';
 
         let className = 'room-poly';
         if (type === 'class') className += ' fill-blue';
         else if (type === 'lab') className += ' fill-teal';
         else if (type === 'washroom') className += ' fill-red';
+        else if (type === 'faculty') className += ' fill-orange';
+        else if (type === 'lift') className += ' fill-pink';
 
         if (isIssue) className += ' has-issue';
+        else if (isInProgress) className += ' in-progress';
 
-        // Accessibility/Interaction attributes
+        const roomName = room ? (room.name || roomNum) : roomNum;
+
         const attrs = room ?
-            `data-room="${roomNum}" data-room-id="${roomId}" onclick="selectRoom('${roomNum}', ${roomId})"` :
+            `data-room="${roomNum}" data-room-id="${roomId}" onclick="selectRoom('${roomNum}', ${roomId}, '${roomName.replace(/'/g, "\\'")}')"` :
             'class="room-disabled"';
+
+        // Use provided label OR room number
+        // Fix for NULL labels: check for null explicitly
+        let displayLabel = labelText;
+        if (displayLabel === undefined || displayLabel === null) {
+            displayLabel = roomNum;
+        }
+
+        let circleHtml = '';
+        if (isAdmin) {
+            const radius = 6;
+            const padding = 4;
+            const cx = x + w - radius - padding;
+            const cy = y + radius + padding;
+            
+            let circleFill = '#28a745'; // normal (green)
+            if (isIssue) circleFill = '#dc3545'; // issue reported (red)
+            else if (isInProgress) circleFill = '#ffc107'; // in progress (yellow)
+            
+            circleHtml = `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${circleFill}" stroke="white" stroke-width="1.5" />`;
+        }
 
         return `
             <g class="room-group" ${attrs}>
                 <rect x="${x}" y="${y}" width="${w}" height="${h}" class="${className}" rx="4" />
-                <text x="${x + w / 2}" y="${y + h / 2}" class="room-text" text-anchor="middle" dominant-baseline="middle">${labelText || roomNum}</text>
+                <text x="${x + w / 2}" y="${y + h / 2}" class="room-text" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="11">${displayLabel}</text>
+                ${circleHtml}
             </g>
         `;
     };
 
-    // ViewBox 0 0 500 800
+    // Right diagonal with a "tip" at top-left
+    // V5: Perfect outline, refined interior grid
+    // Anchor Line: y=500 (Start of lower block)
+    const SVG_OUTLINE = `
+        <path d="M50 10 L480 350 L480 950 L50 950 Z" 
+              class="building-outline" />
+    `;
+
     const svgContent = `
-        <svg viewBox="0 0 500 800" width="100%" height="100%" class="interactive-map">
+        <svg viewBox="0 0 530 980" width="100%" height="100%" class="interactive-map">
             <defs>
                 <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
                     <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
@@ -270,66 +371,83 @@ function renderDetailedLayout(container, rooms, floorLevel) {
                 </filter>
             </defs>
             
-            <!-- CORRIDOR / BACKGROUND STRUCTURE (Optional context) -->
-            <path d="M130 0 L130 800 M330 300 L330 800" stroke="#e9ecef" stroke-width="2" fill="none" />
+            ${SVG_OUTLINE}
 
-            <!-- LEFT COLUMN (Classrooms) -->
-            ${renderRoomRect('01', 20, 50, 100, 100)}
-            ${renderRoomRect('02', 20, 160, 100, 100)}
+            <!-- LEFT COLUMN (x=60, w=100) -->
+            <!-- Top Lifts (3) - Shifted down to clear diagonal -->
+            ${renderRoomRect('Lift1', 60, 50, 30, 25, 'L', 'lift')}
+            ${renderRoomRect('Lift2', 60, 80, 30, 25, 'L', 'lift')}
+            ${renderRoomRect('Lift3', 60, 110, 30, 25, 'L', 'lift')}
+
+            <!-- VY401 (Blue) -->
+            ${renderRoomRect('01', 60, 150, 100, 120)}
             
-            <!-- Gap for corridor/stairs -->
+            <!-- VY402 (Blue) -->
+            ${renderRoomRect('02', 60, 280, 100, 120)}
+
+            <!-- Middle Lifts (2) -->
+            ${renderRoomRect('Lift4', 60, 410, 30, 25, 'L', 'lift')}
+            ${renderRoomRect('Lift5', 60, 440, 30, 25, 'L', 'lift')}
+
+            <!-- LOWER BLOCK START (y=500) -->
             
-            ${renderRoomRect('03', 20, 350, 100, 100)}
-            ${renderRoomRect('04', 20, 460, 100, 100)}
+            <!-- VY403 (Blue) -->
+            ${renderRoomRect('03', 60, 500, 100, 140)}
 
-            <!-- TOP CENTER SECTION -->
-            ${renderRoomRect('24', 140, 50, 100, 140)}
-            ${renderRoomRect('22', 250, 120, 70, 70)}
+            <!-- VY404 (Blue) -->
+            ${renderRoomRect('04', 60, 650, 100, 140)}
 
-            <!-- CENTER LABS SECTION -->
-            ${renderRoomRect('26', 140, 350, 180, 60)}
-            ${renderRoomRect('27', 140, 420, 180, 60)}
-            ${renderRoomRect('28', 140, 490, 180, 60)}
-            ${renderRoomRect('29', 140, 560, 180, 60)}
+            <!-- Bottom Lifts (3) -->
+            ${renderRoomRect('Lift6', 60, 800, 30, 25, 'L', 'lift')}
+            ${renderRoomRect('Lift7', 60, 830, 30, 25, 'L', 'lift')}
+            ${renderRoomRect('Lift8', 60, 860, 30, 25, 'L', 'lift')}
 
-            <!-- RIGHT COLUMN (Classrooms) -->
-            ${renderRoomRect('14', 340, 350, 90, 130)}
-            ${renderRoomRect('13', 340, 490, 90, 130)}
 
-            <!-- FAR RIGHT STRIP (Washrooms/Staff) -->
-            <!-- Top Right cluster -->
-            ${renderRoomRect('19', 440, 300, 40, 30, getRoomNum('19').slice(-3))}
-            ${renderRoomRect('18', 440, 335, 40, 30, getRoomNum('18').slice(-3))}
-            ${renderRoomRect('17', 440, 370, 40, 30, getRoomNum('17').slice(-3))}
-            ${renderRoomRect('16', 440, 405, 40, 30, getRoomNum('16').slice(-3))}
-            ${renderRoomRect('15', 440, 440, 40, 30, getRoomNum('15').slice(-3))}
+            <!-- CENTER COLUMN -->
+            <!-- VY424 (Tall Blue) -->
+            ${renderRoomRect('24', 170, 190, 100, 160)}
 
-            <!-- Bottom Right cluster -->
-            ${renderRoomRect('08', 440, 550, 40, 30, getRoomNum('08').slice(-3))}
-            ${renderRoomRect('07', 440, 585, 40, 30, getRoomNum('07').slice(-3))}
-            
-            <!-- You Here Indicator (Static Position for Demo) -->
-            <g transform="translate(80, 300)">
-                 <path d="M0 0 L10 -5 L10 5 Z" fill="#c8102e" />
-                 <text x="15" y="4" font-size="12" fill="#333">You Are Here</text>
-            </g>
+            <!-- VY422 (Teal) - Tucked -->
+            ${renderRoomRect('22', 280, 290, 80, 100, null, 'lab')} 
+
+            <!-- LAB STACK (Teal) -->
+            <!-- Aligned with start of VY403 (y=500) -->
+            ${renderRoomRect('26', 170, 500, 180, 65, undefined, 'lab')}
+            ${renderRoomRect('27', 170, 575, 180, 65, undefined, 'lab')}
+            ${renderRoomRect('28', 170, 650, 180, 65, undefined, 'lab')}
+            ${renderRoomRect('29', 170, 725, 180, 65, undefined, 'lab')}
+
+
+            <!-- RIGHT COLUMN (x=380) -->
+            <!-- Service Stack Top (Red) -->
+            ${renderRoomRect('18', 380, 370, 90, 22, null, 'washroom')}
+            ${renderRoomRect('17', 380, 400, 90, 22, null, 'washroom')}
+            ${renderRoomRect('16', 380, 430, 90, 22, null, 'washroom')}
+            ${renderRoomRect('15', 380, 460, 90, 22, null, 'washroom')}
+
+            <!-- VY414 (Blue) - Aligned with VY403/Lab26 (y=500) -->
+            ${renderRoomRect('14', 380, 500, 90, 140)}
+
+            <!-- VY413 (Blue) - Aligned with VY404/Lab28 -->
+            ${renderRoomRect('13', 380, 650, 90, 140)}
+
+            <!-- Service Stack Bottom (Red) -->
+            ${renderRoomRect('08', 380, 800, 90, 25, null, 'washroom')}
+            ${renderRoomRect('07', 380, 830, 90, 25, null, 'washroom')}
         </svg>
     `;
-
     container.innerHTML = `
         <div class="vyas-floor-map svg-container">
             ${svgContent}
         </div>
     `;
 
-    // Auto-select room if pre-selected
+    // Auto-select room logic...
     if (typeof preSelectedRoom !== 'undefined' && preSelectedRoom) {
         const roomGroup = container.querySelector(`g[data-room-id="${preSelectedRoom}"]`);
         if (roomGroup) {
             const onclickAttr = roomGroup.getAttribute('onclick');
-            if (onclickAttr) {
-                eval(onclickAttr);
-            }
+            if (onclickAttr) eval(onclickAttr);
         }
     }
 }
@@ -345,13 +463,14 @@ function renderGenericFloor(container, rooms) {
         else if (room.room_type === 'washroom') roomClass += ' washroom';
 
         if (room.status === 'issue') roomClass += ' has-issue';
+        else if (room.status === 'in-progress') roomClass += ' in-progress';
 
         return `
             <div class="${roomClass}" 
                  data-room="${room.number}" 
                  data-room-id="${room.id}"
                  data-type="${room.room_type}"
-                 onclick="selectRoom('${room.number}', ${room.id})">
+                 onclick="selectRoom('${room.number}', ${room.id}, '${(room.name || room.number).replace(/'/g, "\\'")}')">
                 <span class="room-label">${room.number}</span>
             </div>
         `;
@@ -379,12 +498,15 @@ function renderGenericFloor(container, rooms) {
 // ============================================
 // SELECT ROOM
 // ============================================
-function selectRoom(roomNumber, roomId) {
+function selectRoom(roomNumber, roomId, roomName) {
     // Update hidden input
     const roomInput = document.getElementById('room_id');
     if (roomInput) {
         roomInput.value = roomId;
     }
+
+    // Display Name if available, otherwise Number
+    const displayName = roomName || roomNumber;
 
     // Update display
     const display = document.getElementById('selectedRoomDisplay');
@@ -392,20 +514,22 @@ function selectRoom(roomNumber, roomId) {
         display.innerHTML = `
             <div class="room-selected">
                 <i class="bi bi-check-circle-fill me-2"></i>
-                <span class="room-number">${roomNumber}</span>
+                <span class="room-number">${displayName}</span>
                 <small class="d-block">Selected</small>
             </div>
         `;
     }
 
-    // Highlight selected room on map
-    document.querySelectorAll('.room-block, .room-group').forEach(block => {
-        block.classList.remove('selected');
-    });
+    // Highlight on map
+    // Reset previous
+    document.querySelectorAll('.room-group').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.room-poly').forEach(el => el.classList.remove('selected'));
 
-    const selectedBlock = document.querySelector(`[data-room-id="${roomId}"]`);
-    if (selectedBlock) {
-        selectedBlock.classList.add('selected');
+    const roomGroup = document.querySelector(`g[data-room="${roomNumber}"]`);
+    if (roomGroup) {
+        roomGroup.classList.add('selected');
+        const poly = roomGroup.querySelector('.room-poly');
+        if (poly) poly.classList.add('selected');
     }
 
     // Load assets for this room

@@ -20,10 +20,10 @@
 
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark vyas-navbar">
-        <div class="container">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white vyas-navbar">
+        <div class="container-fluid px-4">
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('main.index') }}">
-                <img src="{{ url_for('static', filename='images/MIT-logo.jpeg') }}" alt="MIT-WPU Logo"
+                <img src="{{ url_for('static', filename='images/logo-lm.png') }}" alt="MIT-WPU Logo"
                     class="mitwpu-logo me-2">
                 <div class="brand-text-wrapper">
                     <span class="brand-text">Fix Link</span>
@@ -35,16 +35,67 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.report_form') }}">
-                            <i class="bi bi-plus-circle me-1"></i>Report Issue
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('admin.login') }}">
-                            <i class="bi bi-shield-lock me-1"></i>Admin
-                        </a>
-                    </li>
+                    {% if session.get('user_id') %}
+                        {% if session.get('is_admin') %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('admin.dashboard') }}">
+                                <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        {% endif %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.report_form') }}">
+                                <i class="bi bi-plus-circle me-1"></i>Report Issue
+                            </a>
+                        </li>
+
+                        <!-- Profile Avatar Dropdown -->
+                        <li class="nav-item dropdown ms-2">
+                            {% set nav_user = current_user if current_user is defined else none %}
+                            <a class="nav-link p-0" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="profileDropdown">
+                                <div class="nav-avatar" id="navAvatar">
+                                    <span class="nav-avatar-initials" id="navAvatarInitials">?</span>
+                                    <img class="nav-avatar-img d-none" id="navAvatarImg" src="" alt="Profile">
+                                </div>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end profile-dropdown" aria-labelledby="profileDropdown">
+                                <li class="dropdown-header-item px-3 py-3">
+                                    <div class="d-flex align-items-center gap-3 mb-2">
+                                        <div class="nav-avatar nav-avatar-sm" id="navAvatarDropdown">
+                                            <span class="nav-avatar-initials" id="navAvatarInitialsDropdown">?</span>
+                                            <img class="nav-avatar-img d-none" id="navAvatarImgDropdown" src="" alt="Profile">
+                                        </div>
+                                        <div class="fw-semibold" id="profileName" style="font-size:0.9rem;">Loading…</div>
+                                    </div>
+                                    <div class="profile-info-row">
+                                        <span class="profile-info-label">Email</span>
+                                        <span class="profile-info-value" id="profileEmail">—</span>
+                                    </div>
+                                    <div class="profile-info-row">
+                                        <span class="profile-info-label">PRN</span>
+                                        <span class="profile-info-value" id="profilePRN">—</span>
+                                    </div>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('auth.logout') }}">
+                                        <i class="bi bi-box-arrow-right me-2"></i>Logout
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('auth.login') }}">
+                                <i class="bi bi-box-arrow-in-right me-1"></i>Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('auth.signup') }}">
+                                <i class="bi bi-person-plus me-1"></i>Sign Up
+                            </a>
+                        </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
@@ -56,26 +107,96 @@
     </main>
 
     <!-- Footer -->
-    <footer class="footer mt-auto">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <p class="mb-0">&copy; 2026 FixLink. All rights reserved.</p>
-                </div>
-                <div class="col-md-6 text-md-end">
-                    <p class="mb-0">Vyas Building Smart Maintenance System</p>
-                </div>
-            </div>
-        </div>
-    </footer>
+
 
     <!-- Bootstrap 5 JS Bundle -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Custom JS -->
-    <script src="{{ url_for('static', filename='js/map.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/map.js') }}?v=2"></script>
+    <script type="module" src="{{ url_for('static', filename='js/animations.js') }}"></script>
 
     {% block extra_js %}{% endblock %}
+
+    <script>
+    // Profile Avatar — load user info and wire up photo upload
+    (function () {
+        if (!document.getElementById('navAvatar')) return; // not logged in
+
+        function getInitials(name) {
+            const parts = name.trim().split(/\s+/);
+            if (parts.length === 1) return parts[0][0].toUpperCase();
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+
+        function setAvatar(name, photoUrl) {
+            const initials = getInitials(name || '?');
+            [
+                { ini: 'navAvatarInitials',        img: 'navAvatarImg' },
+                { ini: 'navAvatarInitialsDropdown', img: 'navAvatarImgDropdown' }
+            ].forEach(({ ini, img }) => {
+                const iniEl = document.getElementById(ini);
+                const imgEl = document.getElementById(img);
+                if (!iniEl || !imgEl) return;
+                if (photoUrl) {
+                    imgEl.src = photoUrl;
+                    imgEl.classList.remove('d-none');
+                    iniEl.classList.add('d-none');
+                } else {
+                    iniEl.textContent = initials;
+                    iniEl.classList.remove('d-none');
+                    imgEl.classList.add('d-none');
+                }
+            });
+            const nameEl = document.getElementById('profileName');
+            if (document.getElementById('removePhotoBtn'))
+                document.getElementById('removePhotoBtn').classList.toggle('d-none', !photoUrl);
+            if (nameEl) nameEl.textContent = name;
+        }
+
+        // Fetch current user from server
+        fetch('/api/me')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                const emailEl = document.getElementById('profileEmail');
+                const prnEl = document.getElementById('profilePRN');
+                if (emailEl) emailEl.textContent = data.email;
+                if (prnEl) prnEl.textContent = data.prn || '—';
+                setAvatar(data.name, data.photo_url);
+            })
+            .catch(() => {});
+
+        // Photo upload
+        const uploadInput = document.getElementById('photoUploadInput');
+        if (uploadInput) {
+            uploadInput.addEventListener('change', function () {
+                if (!this.files[0]) return;
+                const formData = new FormData();
+                formData.append('photo', this.files[0]);
+                fetch('/profile/upload-photo', { method: 'POST', body: formData })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) setAvatar(document.getElementById('profileName').textContent, data.photo_url);
+                    });
+            });
+        }
+
+        // Remove photo
+        const removeBtn = document.getElementById('removePhotoBtn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                fetch('/profile/remove-photo', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) setAvatar(document.getElementById('profileName').textContent, null);
+                    });
+            });
+        }
+    })();
+    </script>
+
 </body>
 
 </html>

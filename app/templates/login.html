@@ -1,104 +1,59 @@
 {% extends "base.html" %}
-
-{% block title %}Admin Login - MIT-WPU Vyas Tracker{% endblock %}
-
+{% block title %}Login - MIT-WPU FixLink{% endblock %}
 {% block content %}
-<!-- Login Section -->
-<section class="login-section">
-    <div class="container">
-        <div class="row justify-content-center align-items-center min-vh-80">
-            <div class="col-md-5 col-lg-4">
-                <!-- Login Card -->
-                <div class="login-card slide-up">
-                    <div class="login-header text-center">
-                        <img src="{{ url_for('static', filename='images/MIT-logo.jpeg') }}" alt="MIT-WPU Logo"
-                            class="login-logo mb-3">
-                        <h3 class="login-title">Admin Login</h3>
-                        <p class="login-subtitle">Vyas Building Maintenance Dashboard</p>
+<div class="container mt-5 pt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <img src="{{ url_for('static', filename='images/logo-lm.png') }}" alt="MIT-WPU Logo" class="form-logo mb-3">
+                        <h3 class="mt-3">Welcome Back</h3>
+                        <p class="text-muted">Sign in to your account</p>
                     </div>
-
-                    <!-- Flash Messages -->
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                    {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show"
-                        role="alert">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                    {% endfor %}
-                    {% endif %}
-                    {% endwith %}
-
-                    <!-- Login Form -->
-                    <form method="POST" action="{{ url_for('admin.login') }}" id="loginForm">
+                    
+                    <form method="POST" action="{{ url_for('auth.login') }}">
                         <div class="mb-3">
-                            <label for="username" class="form-label">Username</label>
-                            <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="bi bi-person"></i>
-                                </span>
-                                <input type="text" class="form-control" id="username" name="username"
-                                    placeholder="Enter username" required autofocus>
-                            </div>
+                            <label class="form-label">Email Address</label>
+                            <input type="email" name="email" class="form-control" required placeholder="name@mitwpu.edu.in">
                         </div>
-                        <div class="mb-4">
-                            <label for="password" class="form-label">Password</label>
+                        <div class="mb-1">
+                            <label class="form-label">Password</label>
                             <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="bi bi-lock"></i>
-                                </span>
-                                <input type="password" class="form-control" id="password" name="password"
-                                    placeholder="Enter password" required>
-                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
-                                    <i class="bi bi-eye"></i>
+                                <input type="password" name="password" id="loginPassword" class="form-control" required>
+                                <button type="button" class="btn btn-outline-secondary" onclick="togglePwd()" tabindex="-1">
+                                    <i class="bi bi-eye" id="loginEyeIcon"></i>
                                 </button>
                             </div>
                         </div>
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
-                            </button>
+                        <div class="text-end mb-4">
+                            <a href="{{ url_for('auth.forgot_password') }}" class="text-decoration-none small text-muted">Forgot password?</a>
                         </div>
+                        <button type="submit" class="btn btn-primary w-100 py-2">Login</button>
                     </form>
-
-                    <div class="login-footer text-center mt-4">
-                        <a href="{{ url_for('main.index') }}" class="text-decoration-none">
-                            <i class="bi bi-arrow-left me-1"></i>Back to Home
-                        </a>
+                    
+                    <div class="text-center mt-4">
+                        <p>Don't have an account? <a href="{{ url_for('auth.signup') }}" class="text-decoration-none">Sign Up</a></p>
                     </div>
-                </div>
-
-                <!-- Security Note -->
-                <div class="security-note text-center mt-3">
-                    <small class="text-muted">
-                        <i class="bi bi-shield-check me-1"></i>
-                        Authorized personnel only
-                    </small>
                 </div>
             </div>
         </div>
     </div>
-</section>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Password visibility toggle
-    document.getElementById('togglePassword').addEventListener('click', function () {
-        const passwordInput = document.getElementById('password');
-        const icon = this.querySelector('i');
-
-        if (passwordInput.type === 'password') {
-            passwordInput.type = 'text';
-            icon.classList.remove('bi-eye');
-            icon.classList.add('bi-eye-slash');
-        } else {
-            passwordInput.type = 'password';
-            icon.classList.remove('bi-eye-slash');
-            icon.classList.add('bi-eye');
-        }
-    });
+function togglePwd() {
+    const inp  = document.getElementById('loginPassword');
+    const icon = document.getElementById('loginEyeIcon');
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        inp.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+}
 </script>
 {% endblock %}

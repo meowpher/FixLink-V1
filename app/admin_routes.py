@@ -4,53 +4,26 @@ Admin Routes Blueprint - Maintenance Dashboard
 from functools import wraps
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
+from sqlalchemy import or_
 from . import db
 from .models import Building, Floor, Room, Asset, Ticket
+from .email_utils import send_ticket_email
 
 admin_bp = Blueprint('admin', __name__)
 
-# Hardcoded admin credentials (for development only)
-ADMIN_USERNAME = 'admin'
-ADMIN_PASSWORD = 'mitwpu123'
-
-
-def login_required(f):
+def admin_required(f):
     """Decorator to require admin login."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'admin_logged_in' not in session:
-            return redirect(url_for('admin.login'))
+        if 'user_id' not in session or not session.get('is_admin'):
+            flash('Admin access required.', 'error')
+            return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
     return decorated_function
 
 
-@admin_bp.route('/login', methods=['GET', 'POST'])
-def login():
-    """Admin login page."""
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '').strip()
-        
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            session['admin_logged_in'] = True
-            session['admin_username'] = username
-            return redirect(url_for('admin.dashboard'))
-        else:
-            flash('Invalid credentials', 'error')
-    
-    return render_template('login.html')
-
-
-@admin_bp.route('/logout')
-def logout():
-    """Admin logout."""
-    session.pop('admin_logged_in', None)
-    session.pop('admin_username', None)
-    return redirect(url_for('admin.login'))
-
-
 @admin_bp.route('/')
-@login_required
+@admin_required
 def dashboard():
     """Admin dashboard - view tickets and statistics."""
     # Get filter parameters
@@ -101,7 +74,7 @@ def dashboard():
 
 
 @admin_bp.route('/map')
-@login_required
+@admin_required
 def status_map():
     """Visual status map showing all floors with room status."""
     floor_id = request.args.get('floor', type=int)
@@ -113,7 +86,7 @@ def status_map():
     rooms = []
     
     if vyas:
-        floors = Floor.query.filter_by(building_id=vyas.id).order_by(Floor.level).all()
+        floors = Floor.query.filter(Floor.building_id == vyas.id, Floor.level != 6).order_by(Floor.level).all()
         
         if floor_id:
             selected_floor = Floor.query.get(floor_id)
@@ -130,8 +103,35 @@ def status_map():
                          rooms=rooms)
 
 
+@admin_bp.route('/history')
+@admin_required
+def history():
+    """Admin history page - view fixed tickets with search filtering."""
+    search_query = request.args.get('search', '').strip()
+    
+    # Base query for all fixed tickets
+    query = Ticket.query.filter_by(status=Ticket.STATUS_FIXED)
+    
+    if search_query:
+        search_filter = f"%{search_query}%"
+        query = query.filter(
+            or_(
+                Ticket.reporter_name.ilike(search_filter),
+                Ticket.prn.ilike(search_filter),
+                Ticket.reporter_email.ilike(search_filter)
+            )
+        )
+    
+    # Order by fixed date descending
+    tickets = query.order_by(Ticket.fixed_at.desc(), Ticket.created_at.desc()).all()
+    
+    return render_template('admin_history.html', 
+                         tickets=tickets, 
+                         search_query=search_query)
+
+
 @admin_bp.route('/tickets/<int:ticket_id>/update-status', methods=['POST'])
-@login_required
+@admin_required
 def update_ticket_status(ticket_id):
     """Update ticket status (AJAX endpoint)."""
     ticket = Ticket.query.get_or_404(ticket_id)
@@ -155,6 +155,9 @@ def update_ticket_status(ticket_id):
         
         db.session.commit()
         
+        # Trigger EmailJS notification for ticket update
+        send_ticket_email(ticket, action=new_status)
+        
         return jsonify({
             'success': True,
             'ticket_id': ticket.id,
@@ -168,7 +171,7 @@ def update_ticket_status(ticket_id):
 
 
 @admin_bp.route('/ticket/<int:ticket_id>')
-@login_required
+@admin_required
 def get_ticket_detail(ticket_id):
     """Get ticket details for modal (AJAX)."""
     ticket = Ticket.query.get_or_404(ticket_id)
@@ -179,7 +182,7 @@ def get_ticket_detail(ticket_id):
 
 
 @admin_bp.route('/floor-data/<int:floor_id>')
-@login_required
+@admin_required
 def get_floor_data(floor_id):
     """Get floor data with room statuses for map (AJAX)."""
     floor = Floor.query.get_or_404(floor_id)
@@ -195,3 +198,4 @@ def get_floor_data(floor_id):
             'has_broken_assets': room.has_broken_assets
         } for room in rooms]
     })
+
