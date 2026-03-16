@@ -94,8 +94,8 @@
             <div class="col-lg-5 col-xl-4">
                 <div class="form-panel slide-up" style="animation-delay: 0.1s;">
                     <div class="form-header">
-                        <img src="{{ url_for('static', filename='images/logo-lm.png') }}" alt="MIT-WPU Logo"
-                            class="form-logo">
+                        <img src="{{ url_for('static', filename='images/logo-dm.png') }}" alt="MIT-WPU Logo"
+                            class="form-logo mitwpu-logo">
                         <h4 class="form-title">Report Issue</h4>
                         {% if room_param %}
                         <div class="room-detected-badge">
@@ -172,8 +172,8 @@
 {% block extra_js %}
 <script>
     // Pre-selected values from server (if room param was provided)
-    const preSelectedFloor = {{ selected_floor|default (none) | tojson }};
-    const preSelectedRoom = {{ selected_room|default (none) | tojson }};
+    const preSelectedFloor = {{ selected_floor|default('null')|tojson|safe }};
+    const preSelectedRoom = {{ selected_room|default('null')|tojson|safe }};
     const preSelectedRoomNumber = '{{ room_param|default('') }}';
 </script>
 {% endblock %}

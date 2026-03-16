@@ -20,7 +20,7 @@
 
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-white vyas-navbar">
+    <nav class="navbar navbar-expand-lg vyas-navbar">
         <div class="container-fluid px-4">
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('main.index') }}">
                 <img src="{{ url_for('static', filename='images/logo-lm.png') }}" alt="MIT-WPU Logo"
@@ -47,6 +47,13 @@
                             <a class="nav-link" href="{{ url_for('main.report_form') }}">
                                 <i class="bi bi-plus-circle me-1"></i>Report Issue
                             </a>
+                        </li>
+                        
+                        <!-- Theme Toggle -->
+                        <li class="nav-item">
+                            <button id="themeToggleBtn" class="btn nav-link" title="Toggle dark mode">
+                                <i class="bi bi-moon-fill" id="themeToggleIcon"></i>
+                            </button>
                         </li>
 
                         <!-- Profile Avatar Dropdown -->
@@ -95,6 +102,12 @@
                                 <i class="bi bi-person-plus me-1"></i>Sign Up
                             </a>
                         </li>
+                        <!-- Theme Toggle for Guests -->
+                        <li class="nav-item">
+                            <button id="themeToggleBtnGuest" class="btn nav-link" title="Toggle dark mode">
+                                <i class="bi bi-moon-fill" id="themeToggleIconGuest"></i>
+                            </button>
+                        </li>
                     {% endif %}
                 </ul>
             </div>
@@ -119,6 +132,76 @@
     {% block extra_js %}{% endblock %}
 
     <script>
+    // Theme Toggle Logic
+    (function() {
+        // Function to set theme
+        function setTheme(isDark) {
+            if (isDark) {
+                document.body.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                // Update icons depending on which button exists
+                const icon = document.getElementById('themeToggleIcon');
+                if (icon) {
+                    icon.classList.remove('bi-moon-fill');
+                    icon.classList.add('bi-sun-fill');
+                }
+                const iconGuest = document.getElementById('themeToggleIconGuest');
+                if (iconGuest) {
+                    iconGuest.classList.remove('bi-moon-fill');
+                    iconGuest.classList.add('bi-sun-fill');
+                }
+                // Update Logos
+                const logos = document.querySelectorAll('.mitwpu-logo');
+                logos.forEach(logo => logo.src = "{{ url_for('static', filename='images/logo-dm.png') }}");
+            } else {
+                document.body.removeAttribute('data-theme');
+                document.documentElement.setAttribute('data-bs-theme', 'light');
+                localStorage.setItem('theme', 'light');
+                const icon = document.getElementById('themeToggleIcon');
+                if (icon) {
+                    icon.classList.remove('bi-sun-fill');
+                    icon.classList.add('bi-moon-fill');
+                }
+                const iconGuest = document.getElementById('themeToggleIconGuest');
+                if (iconGuest) {
+                    iconGuest.classList.remove('bi-sun-fill');
+                    iconGuest.classList.add('bi-moon-fill');
+                }
+                // Update Logos
+                const logos = document.querySelectorAll('.mitwpu-logo');
+                logos.forEach(logo => logo.src = "{{ url_for('static', filename='images/logo-lm.png') }}");
+            }
+        }
+
+        // Initialize theme on load
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+            setTheme(true);
+        } else {
+            setTheme(false);
+        }
+
+        // Add event listeners to buttons
+        const btn = document.getElementById('themeToggleBtn');
+        if (btn) {
+            btn.addEventListener('click', () => {
+                const isDark = document.body.getAttribute('data-theme') === 'dark';
+                setTheme(!isDark);
+            });
+        }
+        
+        const btnGuest = document.getElementById('themeToggleBtnGuest');
+        if (btnGuest) {
+            btnGuest.addEventListener('click', () => {
+                const isDark = document.body.getAttribute('data-theme') === 'dark';
+                setTheme(!isDark);
+            });
+        }
+    })();
+
     // Profile Avatar — load user info and wire up photo upload
     (function () {
         if (!document.getElementById('navAvatar')) return; // not logged in
