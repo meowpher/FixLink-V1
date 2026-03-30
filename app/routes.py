@@ -6,19 +6,14 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, current_app, session, redirect, url_for
 from werkzeug.utils import secure_filename
 from . import db
-from .models import Building, Floor, Room, Asset, Ticket, User
+from .models import Building, Floor, Room, Asset, Ticket, User, Notification
 from .email_utils import send_ticket_email
 from .auth_routes import user_login_required
+from .file_utils import ALLOWED_EXTENSIONS, allowed_file
 
 main_bp = Blueprint('main', __name__)
 
-# Allowed image extensions
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-
-
-def allowed_file(filename):
-    """Check if file has an allowed extension."""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+# ALLOWED_EXTENSIONS and allowed_file are defined in file_utils.py (imported above)
 
 
 @main_bp.route('/')
@@ -217,6 +212,7 @@ def submit_report():
 # API Endpoints
 
 @main_bp.route('/api/floors/<int:building_id>', methods=['GET'])
+@user_login_required
 def get_floors(building_id):
     """Get all floors for a building (JSON)."""
     floors = Floor.query.filter_by(building_id=building_id).order_by(Floor.level).all()
@@ -227,6 +223,7 @@ def get_floors(building_id):
 
 
 @main_bp.route('/api/rooms/floor/<int:floor_id>', methods=['GET'])
+@user_login_required
 def get_rooms_by_floor(floor_id):
     """Get all rooms for a floor (JSON)."""
     rooms = Room.query.filter_by(floor_id=floor_id).all()
@@ -241,6 +238,7 @@ def get_rooms_by_floor(floor_id):
 
 
 @main_bp.route('/api/room/<room_number>', methods=['GET'])
+@user_login_required
 def get_room_by_number(room_number):
     """Get room details by room number (JSON)."""
     room = Room.query.filter_by(number=room_number.upper()).first()
@@ -258,6 +256,7 @@ def get_room_by_number(room_number):
 
 
 @main_bp.route('/api/assets/<int:room_id>', methods=['GET'])
+@user_login_required
 def get_assets(room_id):
     """Get all assets for a room (JSON)."""
     assets = Asset.query.filter_by(room_id=room_id).all()
@@ -268,6 +267,7 @@ def get_assets(room_id):
 
 
 @main_bp.route('/api/buildings', methods=['GET'])
+@user_login_required
 def get_buildings():
     """Get all buildings (JSON)."""
     buildings = Building.query.all()
@@ -278,18 +278,98 @@ def get_buildings():
 
 
 @main_bp.route('/api/me')
-@user_login_required
 def get_me():
-    """Return current user's profile info for the navbar avatar."""
-    user = User.query.get(session['user_id'])
-    photo_url = (
-        url_for('static', filename=f'uploads/{user.profile_photo}')
-        if user and user.profile_photo else None
-    )
+    """Return current profile info (user or professional) for the navbar avatar."""
+    if 'user_id' in session:
+        user = User.query.get(session['user_id'])
+        if user:
+            photo_url = (
+                url_for('static', filename=f'uploads/{user.profile_photo}')
+                if user.profile_photo else None
+            )
+            return jsonify({
+                'success': True,
+                'name': user.name,
+                'email': user.email,
+                'prn': user.prn or ('Admin' if user.is_admin else ''),
+                'photo_url': photo_url,
+                'type': 'user'
+            })
+    
+    if 'professional_id' in session:
+        professional = Professional.query.get(session['professional_id'])
+        if professional:
+            # Check if professionals have profile photos (they don't seem to have a field in the model yet, 
+            # but I'll add logic for completeness or if it's added later)
+            photo_url = None
+            if hasattr(professional, 'profile_photo') and professional.profile_photo:
+                photo_url = url_for('static', filename=f'uploads/{professional.profile_photo}')
+            
+            return jsonify({
+                'success': True,
+                'name': professional.name,
+                'email': professional.email or '',
+                'prn': professional.category.title(), # Use category as ID for professionals
+                'photo_url': photo_url,
+                'type': 'professional'
+            })
+            
+    return jsonify({'success': False, 'error': 'Not logged in'}), 401
+
+
+@main_bp.route('/api/notifications', methods=['GET'])
+def get_notifications():
+    """Get notifications for the current user."""
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    notifications = Notification.query.filter_by(user_id=user_id).order_by(Notification.created_at.desc()).limit(20).all()
+    
     return jsonify({
         'success': True,
-        'name': user.name if user else '',
-        'email': user.email if user else '',
-        'prn': user.prn or 'Admin' if user else '',
-        'photo_url': photo_url
+        'notifications': [n.to_dict() for n in notifications],
+        'unread_count': Notification.query.filter_by(user_id=user_id, is_read=False).count()
+    })
+
+
+@main_bp.route('/api/notifications/read-all', methods=['POST'])
+def read_all_notifications():
+    """Mark all notifications as read for current user."""
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    Notification.query.filter_by(user_id=user_id, is_read=False).update({Notification.is_read: True})
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+
+@main_bp.route('/api/notifications/<int:notification_id>/read', methods=['POST'])
+def read_notification(notification_id):
+    """Mark a specific notification as read."""
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    notification = Notification.query.filter_by(id=notification_id, user_id=user_id).first_or_404()
+    notification.is_read = True
+    db.session.commit()
+    
+    return jsonify({'success': True})
+@main_bp.route('/debug-info')
+def debug_info():
+    """Diagnostic info."""
+    import os
+    from .models import Ticket
+    from flask import current_app
+    total = Ticket.query.count()
+    all_statuses = [t.status for t in Ticket.query.all()]
+    return jsonify({
+        'total': total,
+        'all_statuses': all_statuses,
+        'STATUS_OPEN': Ticket.STATUS_OPEN,
+        'db_uri': current_app.config.get('SQLALCHEMY_DATABASE_URI'),
+        'cwd': os.getcwd()
     })

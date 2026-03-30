@@ -35,20 +35,63 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    {% if session.get('user_id') %}
+                    {% if session.get('user_id') or session.get('professional_id') %}
                         {% if session.get('is_admin') %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('admin.dashboard') }}">
                                 <i class="bi bi-speedometer2 me-1"></i>Dashboard
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('admin.chat') }}">
+                                <i class="bi bi-chat-dots me-1"></i>Chat
+                            </a>
+                        </li>
                         {% endif %}
+                        
+                        {% if session.get('professional_id') %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('professional.dashboard') }}">
+                                <i class="bi bi-tools me-1"></i>My Tasks
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('professional.chat') }}">
+                                <i class="bi bi-chat-dots me-1"></i>Chat
+                            </a>
+                        </li>
+                        {% endif %}
+
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.report_form') }}">
                                 <i class="bi bi-plus-circle me-1"></i>Report Issue
                             </a>
                         </li>
                         
+                        {% if session.get('is_admin') %}
+                        <!-- Notifications Dropdown -->
+                        <li class="nav-item dropdown me-2">
+                            <a class="nav-link position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="notificationsDropdown">
+                                <i class="bi bi-bell-fill"></i>
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="notificationBadge" style="font-size: 0.65rem; padding: 0.25em 0.5em;">
+                                    0
+                                </span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end notification-dropdown px-0 py-0" aria-labelledby="notificationsDropdown" style="min-width: 320px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);">
+                                <li class="dropdown-header d-flex justify-content-between align-items-center px-3 py-2 bg-light border-bottom">
+                                    <span class="fw-bold text-dark">Notifications</span>
+                                    <button class="btn btn-sm btn-link p-0 text-decoration-none" id="markAllReadBtn" style="font-size: 0.75rem; color: var(--mitwpu-blue);">Mark all as read</button>
+                                </li>
+                                <div id="notificationList" style="max-height: 350px; overflow-y: auto;">
+                                    <li class="dropdown-item text-center py-4 text-muted">
+                                        <div class="mb-2"><i class="bi bi-bell-slash fs-4"></i></div>
+                                        <span>Loading notifications...</span>
+                                    </li>
+                                </div>
+                            </ul>
+                        </li>
+                        {% endif %}
+
                         <!-- Theme Toggle -->
                         <li class="nav-item">
                             <button id="themeToggleBtn" class="btn nav-link" title="Toggle dark mode">
@@ -58,7 +101,6 @@
 
                         <!-- Profile Avatar Dropdown -->
                         <li class="nav-item dropdown ms-2">
-                            {% set nav_user = current_user if current_user is defined else none %}
                             <a class="nav-link p-0" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="profileDropdown">
                                 <div class="nav-avatar" id="navAvatar">
                                     <span class="nav-avatar-initials" id="navAvatarInitials">?</span>
@@ -78,8 +120,8 @@
                                         <span class="profile-info-label">Email</span>
                                         <span class="profile-info-value" id="profileEmail">—</span>
                                     </div>
-                                    <div class="profile-info-row">
-                                        <span class="profile-info-label">PRN</span>
+                                    <div class="profile-info-row" id="prnRow">
+                                        <span class="profile-info-label">ID/PRN</span>
                                         <span class="profile-info-value" id="profilePRN">—</span>
                                     </div>
                                 </li>
@@ -116,6 +158,18 @@
 
     <!-- Main Content -->
     <main class="main-content">
+        <div class="container mt-3">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show shadow-sm" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
         {% block content %}{% endblock %}
     </main>
 
@@ -319,8 +373,164 @@
             });
         }
     })();
+
+    // Admin Notification System
+    (function() {
+        const dropBtn = document.getElementById('notificationsDropdown');
+        if (!dropBtn) return;
+
+        const badge = document.getElementById('notificationBadge');
+        const list = document.getElementById('notificationList');
+        const markAllReadBtn = document.getElementById('markAllReadBtn');
+
+        async function fetchNotifications() {
+            try {
+                const res = await fetch('/api/notifications');
+                const data = await res.json();
+                if (data.success) {
+                    updateUI(data.notifications, data.unread_count);
+                }
+            } catch (err) {
+                console.error('Failed to fetch notifications:', err);
+            }
+        }
+
+        function updateUI(notifications, unreadCount) {
+            // Cache for modal access
+            localStorage.setItem('cached_notifications', JSON.stringify(notifications));
+            // Update badge
+            if (unreadCount > 0) {
+                badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+                badge.classList.remove('d-none');
+            } else {
+                badge.classList.add('d-none');
+            }
+
+            // Update list
+            if (!notifications || notifications.length === 0) {
+                list.innerHTML = `
+                    <li class="dropdown-item text-center py-4 text-muted border-0">
+                        <div class="mb-2"><i class="bi bi-bell-slash fs-4"></i></div>
+                        <span>No notifications yet</span>
+                    </li>`;
+                return;
+            }
+
+            list.innerHTML = notifications.map(n => `
+                <li class="notification-item ${n.is_read ? '' : 'unread'} p-0 border-bottom">
+                    <a class="dropdown-item py-2 px-3" href="${n.link || '#'}" onclick="handleNotificationClick(${n.id}, event, '${n.link || '#'}')">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <span class="fw-bold text-primary" style="font-size: 0.85rem;">${n.title}</span>
+                            <small class="text-muted" style="font-size: 0.7rem;">${formatTime(n.created_at)}</small>
+                        </div>
+                        <p class="mb-0 text-wrap text-muted" style="font-size: 0.8rem; line-height: 1.3;">${n.message}</p>
+                    </a>
+                </li>
+            `).join('');
+        }
+
+        window.handleNotificationClick = async function(id, e, link) {
+            e.preventDefault();
+            try {
+                // Mark as read in background
+                fetch(`/api/notifications/${id}/read`, { method: 'POST' });
+                
+                // Show in modal instead of navigating
+                const notificationItems = JSON.parse(localStorage.getItem('cached_notifications') || '[]');
+                const notification = notificationItems.find(n => n.id === id);
+                
+                if (notification) {
+                    // Special case: If it's a ticket notification and we're on admin dashboard, use viewTicket
+                    const urlParams = new URLSearchParams(notification.link.split('?')[1] || '');
+                    const ticketId = urlParams.get('ticket_id') || urlParams.get('id');
+                    
+                    if (ticketId && typeof window.viewTicket === 'function') {
+                        window.viewTicket(parseInt(ticketId));
+                        return;
+                    }
+                    
+                    // General notification modal
+                    document.getElementById('notificationModalTitle').textContent = notification.title;
+                    document.getElementById('notificationModalBody').textContent = notification.message;
+                    
+                    const actionBtn = document.getElementById('notificationModalActionBtn');
+                    if (notification.link && notification.link !== '#') {
+                        actionBtn.classList.remove('d-none');
+                        actionBtn.href = notification.link;
+                    } else {
+                        actionBtn.classList.add('d-none');
+                    }
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('notificationModal'));
+                    modal.show();
+                } else if (link && link !== '#') {
+                    // Fallback to link if notification not found in cache
+                    window.location.href = link;
+                }
+                
+                // Reload list to update unread status in the background
+                fetchNotifications();
+            } catch (err) {
+                console.error('Error handling notification click:', err);
+                if (link && link !== '#') window.location.href = link;
+            }
+        };
+
+        if (markAllReadBtn) {
+            markAllReadBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    await fetch('/api/notifications/read-all', { method: 'POST' });
+                    fetchNotifications();
+                } catch (err) {
+                    console.error('Failed to mark all as read:', err);
+                }
+            });
+        }
+
+        function formatTime(isoStr) {
+            const date = new Date(isoStr);
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
+            if (diffInSeconds < 60) return 'Just now';
+            if (diffInSeconds < 3600) return Math.floor(diffInSeconds / 60) + 'm ago';
+            if (diffInSeconds < 86400) return Math.floor(diffInSeconds / 3600) + 'h ago';
+            return date.toLocaleDateString();
+        }
+
+        // Initially fetch and poll
+        fetchNotifications();
+        setInterval(fetchNotifications, 15000); // Poll every 15s
+
+        // Fetch when dropdown is opened to be fresh
+        dropBtn.addEventListener('show.bs.dropdown', fetchNotifications);
+    })();
     </script>
 
+    <!-- Notification Detail Modal -->
+    <div class="modal fade" id="notificationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+                <div class="modal-header border-0 bg-primary text-white py-3">
+                    <h5 class="modal-title d-flex align-items-center" id="notificationModalTitle">
+                        <i class="bi bi-bell-fill me-2"></i>Notification
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <div class="notification-icon-wrapper mb-3">
+                        <i class="bi bi-info-circle text-primary display-4"></i>
+                    </div>
+                    <p class="lead mb-0 text-dark fw-medium" id="notificationModalBody"></p>
+                </div>
+                <div class="modal-footer border-0 justify-content-center pb-4">
+                    <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal" style="border-radius: 10px; font-weight: 500;">Close</button>
+                    <a href="#" id="notificationModalActionBtn" class="btn btn-primary px-4 d-none" style="border-radius: 10px; font-weight: 500; background-color: var(--mitwpu-blue);">Go to Page</a>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

@@ -18,8 +18,14 @@
                     <a href="{{ url_for('admin.status_map') }}" class="btn btn-outline-light me-2">
                         <i class="bi bi-map me-1"></i>Status Map
                     </a>
-                    <a href="{{ url_for('admin.history') }}" class="btn btn-outline-light">
+                    <a href="{{ url_for('admin.history') }}" class="btn btn-outline-light me-2">
                         <i class="bi bi-clock-history me-1"></i>History
+                    </a>
+                    <a href="{{ url_for('admin.professionals') }}" class="btn btn-outline-light me-2">
+                        <i class="bi bi-people me-1"></i>Professionals
+                    </a>
+                    <a href="{{ url_for('admin.help_requests') }}" class="btn btn-outline-light">
+                        <i class="bi bi-hand-thumbs-up me-1"></i>Help Requests
                     </a>
                 </div>
             </div>
@@ -30,8 +36,8 @@
 <!-- Statistics Cards -->
 <section class="stats-section">
     <div class="container">
-        <div class="row g-4">
-            <div class="col-md-6 col-lg-3 fade-in" style="animation-delay: 0s;">
+        <div class="row g-4 justify-content-center">
+            <div class="col-md-6 col-lg fade-in" style="animation-delay: 0s;">
                 <div class="stat-card total">
                     <div class="stat-icon">
                         <i class="bi bi-clipboard-data"></i>
@@ -42,7 +48,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-6 col-lg-3 fade-in" style="animation-delay: 0.1s;">
+            <div class="col-md-6 col-lg fade-in" style="animation-delay: 0.1s;">
                 <div class="stat-card open">
                     <div class="stat-icon">
                         <i class="bi bi-exclamation-circle"></i>
@@ -53,7 +59,18 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-6 col-lg-3 fade-in" style="animation-delay: 0.2s;">
+            <div class="col-md-6 col-lg fade-in" style="animation-delay: 0.15s;">
+                <div class="stat-card assigned">
+                    <div class="stat-icon">
+                        <i class="bi bi-person-check"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 class="stat-number">{{ stats.assigned }}</h3>
+                        <p class="stat-label">Assigned</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg fade-in" style="animation-delay: 0.2s;">
                 <div class="stat-card progress">
                     <div class="stat-icon">
                         <i class="bi bi-arrow-repeat"></i>
@@ -64,7 +81,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-6 col-lg-3 fade-in" style="animation-delay: 0.3s;">
+            <div class="col-md-6 col-lg fade-in" style="animation-delay: 0.3s;">
                 <div class="stat-card fixed">
                     <div class="stat-icon">
                         <i class="bi bi-check-circle"></i>
@@ -123,7 +140,7 @@
             <div class="tab-content" id="ticketsTabContent">
                 
                 <!-- Macro for Table Builder -->
-                {% macro ticket_table(filter_status) %}
+                {% macro ticket_table(status_list) %}
                 <div class="table-responsive">
                     <table class="table table-hover tickets-table mb-0">
                         <thead>
@@ -135,12 +152,13 @@
                                 <th>Status</th>
                                 <th>Date</th>
                                 <th>Actions</th>
+                                <th class="text-center">Map</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% set filtered_tickets = tickets | selectattr('status', 'equalto', filter_status) | list %}
+                            {% set filtered_tickets = tickets | selectattr('status', 'in', status_list) | list %}
                             {% for ticket in filtered_tickets %}
-                            <tr data-ticket-id="{{ ticket.id }}">
+                            <tr data-ticket-id="{{ ticket.id }}" class="clickable-row" onclick="viewTicket({{ ticket.id }})">
                                 <td>
                                     <span class="ticket-id">#{{ ticket.id }}</span>
                                 </td>
@@ -165,9 +183,24 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <span class="status-badge status-{{ ticket.status }}">
-                                        {{ ticket.status|title }}
-                                    </span>
+                                    <div class="status-badge-container">
+                                        {% if ticket.status == 'cancelled' %}
+                                        <button class="status-badge status-cancelled clickable-badge shadow-sm" 
+                                                onclick="event.stopPropagation(); viewCancellationReport({{ ticket.id }})"
+                                                title="View Cancellation Report">
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i> CANCELLED
+                                        </button>
+                                        {% else %}
+                                        <span class="status-badge status-{{ ticket.status }}">
+                                            {{ ticket.status|title }}
+                                            {% if ticket.assigned_professional_id %}
+                                            <div class="small text-muted mt-1">
+                                                <i class="bi bi-person"></i> {{ ticket.assigned_professional.name }}
+                                            </div>
+                                            {% endif %}
+                                        </span>
+                                        {% endif %}
+                                    </div>
                                 </td>
                                 <td>
                                     <small class="text-muted">
@@ -176,38 +209,51 @@
                                 </td>
                                 <td>
                                     <div class="action-buttons">
-                                        <button class="btn btn-sm btn-info" onclick="viewTicket({{ ticket.id }})" 
-                                                title="View Details">
-                                            <i class="bi bi-eye"></i>
-                                        </button>
-                                        {% if ticket.status == 'open' %}
-                                        <button class="btn btn-sm btn-warning" onclick="updateStatus({{ ticket.id }}, 'in-progress')" 
+                                        {% if not ticket.assigned_professional_id and ticket.status in ['open', 'cancelled'] %}
+                                        <a href="{{ url_for('admin.assign_ticket', ticket_id=ticket.id) }}" class="btn btn-sm btn-dark" 
+                                           onclick="event.stopPropagation()"
+                                           title="Assign to Professional">
+                                            <i class="bi bi-person-plus"></i>
+                                        </a>
+                                        {% endif %}
+                                        {% if ticket.assigned_professional_id %}
+                                        <span class="btn btn-sm btn-outline-info" title="Assigned to: {{ ticket.assigned_professional.name }}">
+                                            <i class="bi bi-person-check"></i>
+                                        </span>
+                                        {% endif %}
+                                        {% if ticket.status in ['open', 'cancelled'] %}
+                                        <button class="btn btn-sm btn-warning" onclick="event.stopPropagation(); updateStatus({{ ticket.id }}, 'in-progress')" 
                                                 title="Mark In Progress">
                                             <i class="bi bi-arrow-repeat"></i>
                                         </button>
                                         {% endif %}
                                         {% if ticket.status != 'fixed' %}
-                                        <button class="btn btn-sm btn-success" onclick="updateStatus({{ ticket.id }}, 'fixed')" 
+                                        <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); updateStatus({{ ticket.id }}, 'fixed')" 
                                                 title="Mark Fixed">
                                             <i class="bi bi-check-lg"></i>
                                         </button>
                                         {% endif %}
-                                        <a href="{{ url_for('admin.status_map', floor=ticket.room.floor_id, room=ticket.room.number) }}" class="btn btn-sm btn-primary" 
-                                           title="View on Map">
-                                            <i class="bi bi-geo-alt"></i>
-                                        </a>
-                                        <button class="btn btn-sm btn-danger" onclick="deleteTicket({{ ticket.id }})" 
+                                        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteTicket({{ ticket.id }})" 
                                                 title="Delete Ticket">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </div>
+                                </td>
+                                <td class="text-center">
+                                    <a href="{{ url_for('admin.status_map', floor=ticket.room.floor_id, room=ticket.room.number) }}" 
+                                       onclick="event.stopPropagation()"
+                                       class="btn btn-primary d-inline-flex align-items-center justify-content-center shadow-sm" 
+                                       style="width: 38px; height: 38px; border-radius: 10px;"
+                                       title="View on Map">
+                                        <i class="bi bi-geo-alt-fill"></i>
+                                    </a>
                                 </td>
                             </tr>
                             {% else %}
                             <tr>
                                 <td colspan="7" class="text-center py-5">
                                     <i class="bi bi-inbox display-4 text-muted"></i>
-                                    <p class="mt-3 text-muted">No {{ filter_status }} tickets found matching your criteria</p>
+                                    <p class="mt-3 text-muted">No tickets found matching your criteria</p>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -225,9 +271,20 @@
                         <h5 class="mb-0 text-danger">
                             <i class="bi bi-exclamation-circle me-2"></i>Open Tickets
                         </h5>
-                        <span class="badge bg-danger">{{ (tickets | selectattr('status', 'equalto', 'open') | list) | length }}</span>
+                        <span class="badge bg-danger">{{ (tickets | selectattr('status', 'in', ['open', 'cancelled']) | list) | length }}</span>
                     </div>
-                    {{ ticket_table('open') }}
+                    {{ ticket_table(['open', 'cancelled']) }}
+                </div>
+                
+                <!-- ASSIGNED TICKETS BOX -->
+                <div class="tickets-card">
+                    <div class="tickets-header bg-info bg-opacity-10 border-bottom border-info">
+                        <h5 class="mb-0 text-info">
+                            <i class="bi bi-person-check me-2"></i>Assigned Tickets
+                        </h5>
+                        <span class="badge bg-info">{{ (tickets | selectattr('status', 'equalto', 'assigned') | list) | length }}</span>
+                    </div>
+                    {{ ticket_table(['assigned']) }}
                 </div>
                 
                 <!-- IN-PROGRESS TICKETS BOX -->
@@ -238,7 +295,7 @@
                         </h5>
                         <span class="badge bg-warning text-dark">{{ (tickets | selectattr('status', 'equalto', 'in-progress') | list) | length }}</span>
                     </div>
-                    {{ ticket_table('in-progress') }}
+                    {{ ticket_table(['in-progress']) }}
                 </div>
 
 
@@ -246,6 +303,7 @@
     </div>
 </section>
 
+<!-- Ticket Detail Modal -->
 <!-- Ticket Detail Modal -->
 <div class="modal fade" id="ticketModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -261,6 +319,26 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancellation Report Modal -->
+<div class="modal fade" id="cancellationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+            <div class="modal-header border-0 bg-danger text-white py-3" style="border-radius: 16px 16px 0 0;">
+                <h5 class="modal-title d-flex align-items-center">
+                    <i class="bi bi-file-earmark-diff me-2"></i>Cancellation Report
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" id="cancellationModalBody">
+                <!-- Content loaded dynamically -->
+            </div>
+            <div class="modal-footer border-0 justify-content-center pb-4">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal" style="border-radius: 10px;">Close</button>
             </div>
         </div>
     </div>
@@ -379,7 +457,9 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Status:</label>
-                                <span class="status-badge status-${ticket.status}">${ticket.status}</span>
+                                <span class="status-badge status-${ticket.status}">
+                                    ${ticket.status === 'cancelled' ? '<i class="bi bi-exclamation-triangle-fill me-1"></i> CANCELLED' : ticket.status}
+                                </span>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Created:</label>
@@ -409,5 +489,57 @@
             alert('Failed to load ticket details');
         });
     }
+
+    function viewCancellationReport(ticketId) {
+        fetch(`/admin/ticket/${ticketId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const ticket = data.ticket;
+                const modalBody = document.getElementById('cancellationModalBody');
+                modalBody.innerHTML = `
+                    <div class="text-center mb-4">
+                        <div class="display-4 text-danger mb-2">
+                            <i class="bi bi-person-x-fill"></i>
+                        </div>
+                        <h4>Job Cancelled</h4>
+                        <p class="text-muted">Ticket #${ticket.id}</p>
+                    </div>
+                    <div class="report-details">
+                        <div class="mb-3 p-3 bg-light rounded-3 border">
+                            <label class="form-label fw-bold text-dark d-block">Cancelled By:</label>
+                            <span class="text-danger fw-bold">${ticket.cancelled_by_professional_name || ticket.assigned_professional_name || 'N/A'}</span>
+                            <div class="small text-muted">${ticket.cancelled_by_professional_category || ticket.assigned_professional_category || ''}</div>
+                        </div>
+                        <div class="mb-3 p-3 bg-light rounded-3 border border-danger shadow-sm" style="background-color: #fff8f8 !important;">
+                            <label class="form-label fw-bold text-danger d-block">Reason for Cancellation:</label>
+                            <p class="mb-0 text-dark" style="font-size: 1.1rem; line-height: 1.5;">
+                                "${ticket.cancellation_reason || 'No reason provided.'}"
+                            </p>
+                        </div>
+                        <div class="small text-end text-muted">
+                            <i class="bi bi-clock"></i> ${new Date(ticket.cancelled_at || ticket.updated_at).toLocaleString()}
+                        </div>
+                    </div>
+                `;
+                const modal = new bootstrap.Modal(document.getElementById('cancellationModal'));
+                modal.show();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to load details'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to load cancellation details');
+        });
+    }
+    // Check for ticket_id in URL to auto-open modal
+    window.addEventListener('load', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const ticketId = urlParams.get('ticket_id');
+        if (ticketId) {
+            viewTicket(parseInt(ticketId));
+        }
+    });
 </script>
 {% endblock %}

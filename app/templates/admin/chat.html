@@ -1,0 +1,592 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Chat - FixLink{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-container {
+        height: calc(100vh - 160px);
+        display: flex;
+        background: var(--bg-card);
+        border-radius: var(--border-radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--border-color);
+        margin-bottom: 2rem;
+    }
+
+    /* Sidebar Styles */
+    .chat-sidebar {
+        width: 320px;
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .sidebar-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .sidebar-header h4 {
+        margin: 0;
+        font-weight: 700;
+        color: var(--mitwpu-blue);
+    }
+
+    .prof-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .prof-item {
+        padding: 1rem 1.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        position: relative;
+    }
+
+    .prof-item:hover {
+        background: rgba(11, 77, 140, 0.05);
+    }
+
+    .prof-item.active {
+        background: rgba(11, 77, 140, 0.1);
+    }
+    
+    .prof-item.active::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: var(--mitwpu-blue);
+    }
+
+    .prof-avatar {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: var(--mitwpu-blue);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        flex-shrink: 0;
+    }
+
+    .prof-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .prof-name {
+        font-weight: 600;
+        margin-bottom: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--text-main);
+    }
+
+    .prof-category {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .unread-badge {
+        background: var(--mitwpu-red);
+        color: white;
+        border-radius: 10px;
+        padding: 2px 8px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        box-shadow: 0 2px 4px rgba(200, 16, 46, 0.3);
+    }
+
+    /* Main Chat Area */
+    .chat-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-card);
+    }
+
+    .chat-header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .chat-messages {
+        flex: 1;
+        padding: 1.5rem;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        background: rgba(0,0,0,0.01);
+    }
+
+    .message {
+        max-width: 70%;
+        margin-bottom: 0.5rem;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .message-content {
+        padding: 0.85rem 1.15rem;
+        border-radius: 18px;
+        position: relative;
+        font-size: 0.95rem;
+        box-shadow: var(--shadow-sm);
+        word-break: break-word;
+    }
+
+    .message.sent {
+        align-self: flex-end;
+    }
+
+    .message.sent .message-content {
+        background: linear-gradient(135deg, var(--mitwpu-blue) 0%, var(--mitwpu-blue-dark) 100%);
+        color: white;
+        border-bottom-right-radius: 4px;
+    }
+
+    .message.received {
+        align-self: flex-start;
+    }
+
+    .message.received .message-content {
+        background: var(--bg-card);
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+        border-bottom-left-radius: 4px;
+    }
+
+    .message-time {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        margin-top: 4px;
+    }
+
+    .message.sent .message-time {
+        align-self: flex-end;
+        color: var(--text-muted);
+    }
+
+    .message.received .message-time {
+        align-self: flex-start;
+    }
+
+    .chat-footer {
+        padding: 1.25rem 1.5rem;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        gap: 12px;
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .chat-input-wrapper {
+        flex: 1;
+        position: relative;
+    }
+
+    .chat-input {
+        width: 100%;
+        border-radius: 25px;
+        padding: 0.75rem 1.5rem;
+        border: 1px solid var(--border-color);
+        background: var(--bg-card);
+        color: var(--text-main);
+        transition: all 0.3s;
+    }
+
+    .chat-input:focus {
+        border-color: var(--mitwpu-blue);
+        box-shadow: 0 0 0 3px rgba(11, 77, 140, 0.1);
+        outline: none;
+    }
+
+    .send-btn {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--mitwpu-blue);
+        color: white;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        transition: all 0.3s;
+        box-shadow: var(--shadow-md);
+    }
+
+    .send-btn:hover:not(:disabled) {
+        background: var(--mitwpu-blue-dark);
+        transform: scale(1.05);
+    }
+
+    .send-btn:disabled {
+        background: var(--text-muted);
+        transform: none;
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .no-chat-selected {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: var(--text-muted);
+        padding: 2rem;
+    }
+
+    .no-chat-selected i {
+        font-size: 5rem;
+        margin-bottom: 1.5rem;
+        opacity: 0.15;
+    }
+
+    /* Scrollbar Styling */
+    .prof-list::-webkit-scrollbar,
+    .chat-messages::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .prof-list::-webkit-scrollbar-thumb,
+    .chat-messages::-webkit-scrollbar-thumb {
+        background: rgba(11, 77, 140, 0.1);
+        border-radius: 10px;
+    }
+
+    [data-theme="dark"] .chat-sidebar { background: rgba(0, 0, 0, 0.2); }
+    [data-theme="dark"] .chat-header { background: rgba(0, 0, 0, 0.1); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div id="chatConfig" data-professional-id="{{ professional_id if professional_id else '' }}" class="d-none"></div>
+    <div class="chat-container">
+        <!-- Sidebar -->
+        <div class="chat-sidebar">
+            <div class="sidebar-header">
+                <h4 class="d-flex align-items-center gap-2">
+                    <i class="bi bi-chat-dots-fill"></i> Messages
+                </h4>
+            </div>
+            <div class="prof-list" id="professionalsList">
+                <!-- Loading State -->
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Chat -->
+        <div class="chat-main" id="chatMain">
+            <!-- No Selection State -->
+            <div class="no-chat-selected" id="noSelection">
+                <i class="bi bi-chat-left-dots"></i>
+                <h3>Select a Professional</h3>
+                <p>Start a conversation with a technician to discuss maintenance jobs.</p>
+            </div>
+
+            <!-- Active Chat State -->
+            <div class="d-none" id="activeChat" style="height: 100%; flex-direction: column;">
+                <div class="chat-header">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="prof-avatar" id="activeProfAvatar">?</div>
+                        <div>
+                            <h5 class="prof-name" id="activeProfName">...</h5>
+                            <span class="prof-category" id="activeProfCategory">...</span>
+                        </div>
+                    </div>
+                    <button onclick="resetSelectedChat()" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                        <i class="bi bi-trash-fill me-1"></i>Reset History
+                    </button>
+                </div>
+                
+                <div class="chat-messages" id="chatMessages">
+                    <!-- Messages will be loaded here -->
+                </div>
+
+                <div class="chat-footer">
+                    <div class="chat-input-wrapper">
+                        <input type="text" id="chatInput" class="chat-input" placeholder="Type a message..." autocomplete="off">
+                    </div>
+                    <button id="sendBtn" class="send-btn" disabled>
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script>
+    let socket;
+    const chatConfig = document.getElementById('chatConfig');
+    let selectedProfessionalId = chatConfig.dataset.professionalId ? parseInt(chatConfig.dataset.professionalId) : null;
+    let professionals = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+        initSocket();
+        loadProfessionals();
+        
+        document.getElementById('sendBtn').addEventListener('click', sendMessage);
+        document.getElementById('chatInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') sendMessage();
+        });
+        
+        document.getElementById('chatInput').addEventListener('input', function() {
+            document.getElementById('sendBtn').disabled = !this.value.trim();
+        });
+    });
+
+    function initSocket() {
+        try {
+            if (typeof io !== 'undefined') {
+                socket = io();
+                socket.on('new_chat_message', function(data) {
+                    console.log('Received chat message:', data, 'Selected ID:', selectedProfessionalId);
+                    // If it's from the currently selected professional, add to view
+                    if (data.sender_type === 'professional' && data.sender_id == selectedProfessionalId) {
+                        console.log('Adding message to active view');
+                        addMessageToView(data, false);
+                        // Mark as read in backend and refresh sidebar
+                        fetch(`/admin/api/chat/history/${selectedProfessionalId}`).then(() => {
+                            loadProfessionals();
+                        }); 
+                    } else if (data.sender_type === 'professional') {
+                        // Otherwise update unread count in sidebar
+                        loadProfessionals(); // Refresh list to update counts
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Socket init error:', e);
+        }
+    }
+
+    async function loadProfessionals() {
+        try {
+            const response = await fetch('/admin/api/chat/professionals');
+            const data = await response.json();
+            if (data.success) {
+                professionals = data.professionals;
+                renderProfessionals();
+                
+                // If a professional was pre-selected, just update the sidebar highlighing
+                // but DON'T call selectProfessional as it reloads history and clears view
+                if (selectedProfessionalId) {
+                    const items = document.querySelectorAll('.prof-item');
+                    professionals.forEach((p, index) => {
+                        if (p.id === selectedProfessionalId) {
+                            items[index]?.classList.add('active');
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error loading professionals:', error);
+            document.getElementById('professionalsList').innerHTML = '<div class="text-center py-4 text-danger">Error loading technicians</div>';
+        }
+    }
+
+    function renderProfessionals() {
+        const list = document.getElementById('professionalsList');
+        list.innerHTML = '';
+        
+        if (professionals.length === 0) {
+            list.innerHTML = '<div class="text-center py-4 text-muted">No active professionals found</div>';
+            return;
+        }
+
+        professionals.forEach(prof => {
+            const initials = prof.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            const item = document.createElement('div');
+            item.className = `prof-item ${selectedProfessionalId === prof.id ? 'active' : ''}`;
+            item.innerHTML = `
+                <div class="prof-avatar">${initials}</div>
+                <div class="prof-info">
+                    <p class="prof-name text-dark fw-bold mb-0">${prof.name}</p>
+                    <span class="prof-category text-muted small">${prof.category}</span>
+                </div>
+                ${prof.unread_count > 0 ? `<span class="unread-badge">${prof.unread_count}</span>` : ''}
+            `;
+            item.onclick = () => selectProfessional(prof.id, prof.name, prof.category);
+            list.appendChild(item);
+        });
+    }
+
+    async function selectProfessional(id, name, category) {
+        selectedProfessionalId = id;
+        
+        // Update UI state
+        document.getElementById('noSelection').classList.add('d-none');
+        document.getElementById('activeChat').classList.remove('d-none');
+        document.getElementById('activeChat').style.display = 'flex';
+        
+        document.getElementById('activeProfName').innerText = name;
+        document.getElementById('activeProfCategory').innerText = category;
+        document.getElementById('activeProfAvatar').innerText = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        
+        // Mark active in sidebar
+        document.querySelectorAll('.prof-item').forEach(el => el.classList.remove('active'));
+        const activeItem = professionals.findIndex(p => p.id === id);
+        if (activeItem !== -1) {
+            const items = document.querySelectorAll('.prof-item');
+            if (items[activeItem]) items[activeItem].classList.add('active');
+        }
+
+        // Load history
+        loadChatHistory(id);
+        
+        // Reset unread badge locally for better UX
+        const badge = document.querySelectorAll('.prof-item')[activeItem]?.querySelector('.unread-badge');
+        if (badge) badge.remove();
+        
+        // Focus input
+        document.getElementById('chatInput').focus();
+    }
+
+    async function loadChatHistory(profId) {
+        const container = document.getElementById('chatMessages');
+        container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div></div>';
+        
+        try {
+            const response = await fetch(`/admin/api/chat/history/${profId}`);
+            const data = await response.json();
+            if (data.success) {
+                container.innerHTML = '';
+                if (data.messages.length === 0) {
+                    container.innerHTML = '<div class="text-center text-muted py-5">No messages yet. Say hello!</div>';
+                } else {
+                    data.messages.forEach(msg => {
+                        const isSentByMe = msg.sender_type === 'admin';
+                        addMessageToView(msg, isSentByMe);
+                    });
+                }
+                scrollToBottom();
+            }
+        } catch (error) {
+            console.error('Error loading history:', error);
+            container.innerHTML = '<div class="alert alert-danger mx-3">Failed to load chat history</div>';
+        }
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('chatInput');
+        const text = input.value.trim();
+        if (!text || !selectedProfessionalId) return;
+
+        input.value = '';
+        document.getElementById('sendBtn').disabled = true;
+
+        try {
+            const response = await fetch('/admin/api/chat/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    professional_id: selectedProfessionalId,
+                    message: text
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                addMessageToView(data.message, true);
+                scrollToBottom();
+            }
+        } catch (error) {
+            console.error('Error sending message:', error);
+            alert('Failed to send message');
+        } finally {
+            input.focus();
+            document.getElementById('sendBtn').disabled = false;
+        }
+    }
+
+    function addMessageToView(msg, isSentByMe) {
+        const container = document.getElementById('chatMessages');
+        
+        // Remove "No messages yet" placeholder if it exists
+        if (container.innerText === 'No messages yet. Say hello!') {
+            container.innerHTML = '';
+        }
+
+        const div = document.createElement('div');
+        div.className = `message ${isSentByMe ? 'sent' : 'received'}`;
+        
+        // Handle UTC ISO strings by ensuring they are treated as UTC
+        const timestampStr = msg.timestamp.endsWith('Z') ? msg.timestamp : msg.timestamp + 'Z';
+        const timestamp = new Date(timestampStr);
+        const time = timestamp.toLocaleTimeString('en-IN', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true,
+            timeZone: 'Asia/Kolkata' 
+        });
+        
+        div.innerHTML = `
+            <div class="message-content">
+                ${msg.message}
+            </div>
+            <div class="message-time">${time}</div>
+        `;
+        container.appendChild(div);
+        scrollToBottom();
+    }
+
+    function scrollToBottom() {
+        const container = document.getElementById('chatMessages');
+        container.scrollTop = container.scrollHeight;
+    }
+
+    async function resetSelectedChat() {
+        if (!selectedProfessionalId) return;
+        const profName = document.getElementById('activeProfName').innerText;
+        
+        if (!confirm(`Are you sure you want to clear the chat history with ${profName}? This cannot be undone.`)) return;
+        
+        try {
+            const response = await fetch(`/admin/api/chat/reset/${selectedProfessionalId}`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                document.getElementById('chatMessages').innerHTML = '<div class="text-center py-5 text-muted">Chat history cleared.</div>';
+                // Also update sidebar to clear any unread badges if necessary
+                loadProfessionals();
+            } else {
+                alert('Failed to reset chat: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error resetting chat:', error);
+            alert('Network error. Please try again.');
+        }
+    }
+</script>
+{% endblock %}

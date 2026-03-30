@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+
+{% block title %}Chat with Admin - FixLink{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-container {
+        height: calc(100vh - 160px);
+        background: var(--bg-card);
+        border-radius: var(--border-radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--border-color);
+        margin-bottom: 2rem;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Professional Chat Theme Customization */
+    :root {
+        --chat-header-bg: linear-gradient(135deg, #0b4d8c 0%, #1a73e8 100%);
+    }
+
+    .chat-header {
+        padding: 1.25rem 1.75rem;
+        background: var(--chat-header-bg);
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .chat-messages {
+        flex: 1;
+        padding: 2rem;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        background: #f8faff;
+    }
+
+    /* Dark mode adjustments for messages bg */
+    [data-theme="dark"] .chat-messages {
+        background: #0f172a;
+    }
+
+    .message {
+        max-width: 65%;
+        padding: 0.85rem 1.15rem;
+        border-radius: 1.25rem;
+        position: relative;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        animation: messageFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes messageFadeIn {
+        from { opacity: 0; transform: translateY(10px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .message.sent {
+        align-self: flex-end;
+        background: var(--mitwpu-blue);
+        color: white;
+        border-bottom-right-radius: 0.25rem;
+    }
+
+    .message.received {
+        align-self: flex-start;
+        background: white;
+        color: #1e293b;
+        border: 1px solid var(--border-color);
+        border-bottom-left-radius: 0.25rem;
+    }
+
+    [data-theme="dark"] .message.received {
+        background: #1e293b;
+        color: #f1f5f9;
+        border-color: #334155;
+    }
+
+    .message-time {
+        font-size: 0.725rem;
+        margin-top: 0.4rem;
+        opacity: 0.7;
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .message.received .message-time {
+        justify-content: flex-start;
+    }
+
+    .chat-input-area {
+        padding: 1.5rem 1.75rem;
+        background: white;
+        border-top: 1px solid var(--border-color);
+    }
+
+    [data-theme="dark"] .chat-input-area {
+        background: #1e293b;
+    }
+
+    .input-wrapper {
+        display: flex;
+        gap: 12px;
+        background: #f1f5f9;
+        padding: 10px 14px;
+        border-radius: 2rem;
+        border: 1px solid transparent;
+        transition: all 0.2s;
+    }
+
+    [data-theme="dark"] .input-wrapper {
+        background: #0f172a;
+        border-color: #334155;
+    }
+
+    .input-wrapper:focus-within {
+        border-color: var(--mitwpu-blue);
+        background: white;
+        box-shadow: 0 0 0 4px rgba(11, 77, 140, 0.1);
+    }
+
+    [data-theme="dark"] .input-wrapper:focus-within {
+        background: #0f172a;
+    }
+
+    .input-wrapper input {
+        flex: 1;
+        border: none;
+        background: transparent;
+        padding: 4px 0;
+        outline: none;
+        color: var(--text-main);
+        font-size: 0.95rem;
+    }
+
+    .send-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: var(--mitwpu-blue);
+        color: white;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        flex-shrink: 0;
+    }
+
+    .send-btn:hover {
+        transform: scale(1.1) rotate(-10deg);
+        background: #093d70;
+        box-shadow: 0 4px 12px rgba(11, 77, 140, 0.3);
+    }
+
+    .send-btn:active {
+        transform: scale(0.95);
+    }
+
+    .admin-status-dot {
+        width: 10px;
+        height: 10px;
+        background: #22c55e;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 6px;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="chat-container">
+        <div class="chat-header shadow-sm">
+            <div class="d-flex align-items-center gap-3">
+                <div class="nav-avatar nav-avatar-sm" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.3);">
+                    <i class="bi bi-shield-lock-fill"></i>
+                </div>
+                <div>
+                    <h5 class="mb-0 fw-bold">FixLink Support</h5>
+                    <div class="d-flex align-items-center">
+                        <span class="admin-status-dot"></span>
+                        <small class="opacity-75">Admin Support Team</small>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button onclick="resetChat()" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                    <i class="bi bi-trash-fill me-1"></i>Reset Chat
+                </button>
+                <a href="{{ url_for('professional.dashboard') }}" class="btn btn-sm btn-outline-light rounded-pill px-3">
+                    <i class="bi bi-grid-fill me-1"></i>Dashboard
+                </a>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+            <!-- Messages will be dynamically loaded here -->
+        </div>
+
+        <div class="chat-input-area">
+            <div class="input-wrapper">
+                <input type="text" id="chat-input" placeholder="How can we help you today?" onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button class="send-btn" onclick="sendMessage()">
+                    <i class="bi bi-send-fill"></i>
+                </button>
+            </div>
+            <div class="text-center mt-2">
+                <small class="text-muted" style="font-size: 0.75rem;">Messages are sent immediately to the administrative team.</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+    let socket;
+    const professionalId = {{ professional.id }};
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Socket.IO
+        socket = io();
+        
+        socket.on('connect', () => {
+            console.log('Connected to WebSocket');
+        });
+
+        socket.on('new_chat_message', function(data) {
+            // Check if message is relevant (from admin to me, or from me to admin)
+            const isFromAdminToMe = data.sender_type === 'admin' && data.receiver_id === professionalId;
+            const isFromMeToAdmin = data.sender_type === 'professional' && data.sender_id === professionalId;
+            
+            if (isFromAdminToMe || isFromMeToAdmin) {
+                addMessageToChat(data);
+            }
+        });
+
+        loadChatHistory();
+    });
+
+    function loadChatHistory() {
+        const container = document.getElementById('chat-messages');
+        container.innerHTML = '<div class="text-center py-5 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Syncing messages...</div>';
+
+        fetch('/professional/api/chat/history')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    container.innerHTML = '';
+                    if (data.messages.length === 0) {
+                        container.innerHTML = `
+                            <div class="text-center py-5 mt-4">
+                                <div class="mb-3 text-muted opacity-50"><i class="bi bi-chat-left-text fs-1"></i></div>
+                                <h6 class="text-muted">No messages yet.</h6>
+                                <p class="text-muted small">Send a message to start chatting with the admins.</p>
+                            </div>
+                        `;
+                    } else {
+                        data.messages.forEach(msg => addMessageToChat(msg));
+                    }
+                    scrollToBottom();
+                }
+            })
+            .catch(err => {
+                container.innerHTML = '<div class="alert alert-danger m-3">Failed to load chat history.</div>';
+            });
+    }
+
+    function sendMessage() {
+        const input = document.getElementById('chat-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        // Disable input while sending
+        input.disabled = true;
+
+        fetch('/professional/api/chat/send', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: message})
+        })
+        .then(response => response.json())
+        .then(data => {
+            input.disabled = false;
+            if (data.success) {
+                input.value = '';
+                input.focus();
+                // We don't manually add the message here because Socket.IO will broadcast it back
+            } else {
+                alert('Failed to send message: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            input.disabled = false;
+            alert('Network error. Please try again.');
+        });
+    }
+
+    function addMessageToChat(data) {
+        const container = document.getElementById('chat-messages');
+        
+        // Remove empty state if present
+        const emptyState = container.querySelector('.text-center.py-5');
+        if (emptyState) emptyState.remove();
+
+        const isMe = data.sender_type === 'professional';
+        
+        const div = document.createElement('div');
+        div.className = `message ${isMe ? 'sent' : 'received'}`;
+        
+        // Handle UTC ISO strings by ensuring they are treated as UTC
+        const timestampStr = data.timestamp.endsWith('Z') ? data.timestamp : data.timestamp + 'Z';
+        const timestamp = new Date(timestampStr);
+        const timeStr = timestamp.toLocaleTimeString('en-IN', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true,
+            timeZone: 'Asia/Kolkata' 
+        });
+        
+        div.innerHTML = `
+            <div class="message-content">${data.message}</div>
+            <div class="message-time">${timeStr}</div>
+        `;
+        
+        container.appendChild(div);
+        scrollToBottom();
+    }
+
+    function resetChat() {
+        if (!confirm('Are you sure you want to clear your chat history with admins? This cannot be undone.')) return;
+        
+        fetch('/professional/api/chat/reset', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const container = document.getElementById('chat-messages');
+                container.innerHTML = `
+                    <div class="text-center py-5 mt-4">
+                        <div class="mb-3 text-muted opacity-50"><i class="bi bi-chat-left-text fs-1"></i></div>
+                        <h6 class="text-muted">No messages yet.</h6>
+                        <p class="text-muted small">Send a message to start chatting with the admins.</p>
+                    </div>
+                `;
+                showToast('Chat history cleared.', 'info');
+            } else {
+                alert('Failed to reset chat: ' + data.error);
+            }
+        });
+    }
+
+    function scrollToBottom() {
+        const container = document.getElementById('chat-messages');
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function showToast(message, type) {
+        // Simple toast notification - type mapping to bootstrap alert classes
+        const alertType = type === 'error' ? 'danger' : type;
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${alertType} position-fixed shadow-lg`;
+        toast.style.cssText = 'top: 20px; right: 20px; z-index: 10000; min-width: 300px; border-radius: 12px;';
+        
+        const content = document.createElement('div');
+        content.className = 'd-flex justify-content-between align-items-center';
+        content.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="bi bi-info-circle-fill me-2"></i>
+                <span>${message}</span>
+            </div>
+            <button type="button" class="btn-close ms-2" style="font-size: 0.75rem;" onclick="this.parentElement.parentElement.remove()"></button>
+        `;
+        
+        toast.appendChild(content);
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.5s ease';
+                setTimeout(() => toast.remove(), 500);
+            }
+        }, 5000);
+    }
+</script>
+{% endblock %}

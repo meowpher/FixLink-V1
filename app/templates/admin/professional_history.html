@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}Professional History - {{ professional.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin.professionals') }}">Professionals</a></li>
+                    <li class="breadcrumb-item active">{{ professional.name }} History</li>
+                </ol>
+            </nav>
+            <h2>Job History: {{ professional.name }}</h2>
+            <span class="badge bg-info">{{ category_name }}</span>
+        </div>
+        <a href="{{ url_for('admin.professionals') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Jobs Completed</h5>
+                    <h2 class="display-4">{{ completed_jobs|length }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Jobs Cancelled</h5>
+                    <h2 class="display-4">{{ cancelled_jobs|length }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Completed Jobs -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0 text-success"><i class="bi bi-check-circle-fill me-2"></i>Completed Jobs</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Room</th>
+                            <th>Issue</th>
+                            <th>Completion Date</th>
+                            <th>Photo</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for job in completed_jobs %}
+                        <tr>
+                            <td>#{{ job.id }}</td>
+                            <td>{{ job.room.number }}</td>
+                            <td>{{ job.issue_type|title }}</td>
+                            <td>{{ job.job_completed_at|ist('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                {% if job.completion_photo_filename %}
+                                <img src="{{ url_for('static', filename='uploads/' + job.completion_photo_filename) }}" 
+                                     alt="Completion Photo" class="img-thumbnail" style="height: 50px; cursor: pointer;"
+                                     onclick="window.showPhoto('{{ url_for('static', filename='uploads/' + job.completion_photo_filename) }}')">
+                                {% else %}
+                                <span class="text-muted">No photo</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewTicket({{ job.id }})">Details</button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">No completed jobs found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cancelled Jobs -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0 text-danger"><i class="bi bi-x-circle-fill me-2"></i>Cancelled Jobs</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Room</th>
+                            <th>Issue</th>
+                            <th>Cancellation Date</th>
+                            <th>Reason</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for job in cancelled_jobs %}
+                        <tr>
+                            <td>#{{ job.id }}</td>
+                            <td>{{ job.room.number }}</td>
+                            <td>{{ job.issue_type|title }}</td>
+                            <td>{{ job.cancelled_at|ist('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                <div class="text-truncate" style="max-width: 250px;" title="{{ job.cancellation_reason }}">
+                                    {{ job.cancellation_reason }}
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewTicket({{ job.id }})">Details</button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">No cancelled jobs found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Photo Modal -->
+<div class="modal fade" id="photoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0">
+            <div class="modal-header">
+                <h5 class="modal-title">Job Completion Photo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0 text-center bg-black">
+                <img id="modalPhoto" src="" class="img-fluid" style="max-height: 80vh;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ticket Detail Modal (Shared) -->
+<div class="modal fade" id="ticketModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ticket Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="ticketModalBody">
+                <!-- Loaded via JS -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let photoModal;
+    let ticketModal;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        photoModal = new bootstrap.Modal(document.getElementById('photoModal'));
+        ticketModal = new bootstrap.Modal(document.getElementById('ticketModal'));
+    });
+    
+    window.showPhoto = function(url) {
+        document.getElementById('modalPhoto').src = url;
+        photoModal.show();
+    };
+    
+    window.viewTicket = function(id) {
+        fetch(`/admin/ticket/${id}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const t = data.ticket;
+                let html = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>ID:</strong> #${t.id}</p>
+                            <p><strong>Status:</strong> <span class="badge bg-${getStatusColor(t.status)}">${t.status.toUpperCase()}</span></p>
+                            <p><strong>Room:</strong> ${t.room_number}</p>
+                            <p><strong>Reporter:</strong> ${t.reporter_name}</p>
+                            <p><strong>Issue:</strong> ${t.issue_type}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Created:</strong> ${new Date(t.created_at).toLocaleString()}</p>
+                            ${t.fixed_at ? `<p><strong>Fixed:</strong> ${new Date(t.fixed_at).toLocaleString()}</p>` : ''}
+                            ${t.cancelled_at ? `<p><strong>Cancelled:</strong> ${new Date(t.cancelled_at).toLocaleString()}</p>` : ''}
+                            ${t.cancellation_reason ? `<p class="text-danger"><strong>Reason:</strong> ${t.cancellation_reason}</p>` : ''}
+                        </div>
+                    </div>
+                    <hr>
+                    <p><strong>Description:</strong></p>
+                    <p class="p-3 bg-light rounded">${t.description}</p>
+                `;
+                
+                if (t.completion_photo_filename) {
+                    html += `
+                        <div class="mt-3">
+                            <p><strong>Completion Photo:</strong></p>
+                            <img src="/static/uploads/${t.completion_photo_filename}" class="img-fluid rounded border shadow-sm">
+                        </div>
+                    `;
+                } else if (t.image_filename) {
+                     html += `
+                        <div class="mt-3">
+                            <p><strong>Report Photo:</strong></p>
+                            <img src="/static/uploads/${t.image_filename}" class="img-fluid rounded border shadow-sm">
+                        </div>
+                    `;
+                }
+                
+                document.getElementById('ticketModalBody').innerHTML = html;
+                ticketModal.show();
+            }
+        });
+    };
+    
+    function getStatusColor(status) {
+        switch(status) {
+            case 'fixed': return 'success';
+            case 'cancelled': return 'danger';
+            case 'in-progress': return 'warning text-dark';
+            case 'assigned': return 'info text-dark';
+            default: return 'secondary';
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Task History - FixLink Professional{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --mitwpu-blue: #0b4d8c;
+        --mitwpu-blue-dark: #083c6d;
+        --mitwpu-blue-light: #1565b3;
+        --mitwpu-gold: #c6a15b;
+        --mitwpu-white: #ffffff;
+        --mitwpu-gray: #f8f9fa;
+        --mitwpu-gray-dark: #343a40;
+        --border-radius-lg: 16px;
+        --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.1);
+        --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    [data-theme="dark"] {
+        --bg-card: rgba(30, 30, 30, 0.7);
+        --border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .history-header {
+        background: linear-gradient(135deg, var(--mitwpu-blue) 0%, var(--mitwpu-blue-dark) 100%);
+        color: white;
+        padding: 4rem 0 6rem 0;
+        margin-bottom: -4rem;
+    }
+
+    .history-card {
+        background: var(--bg-card, white);
+        border-radius: var(--border-radius-lg);
+        border: 1px solid var(--border-color, #eee);
+        box-shadow: var(--shadow-lg);
+        overflow: hidden;
+    }
+
+    .table th {
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        color: var(--mitwpu-blue);
+        border-top: none;
+    }
+
+    .ticket-id {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 700;
+        color: var(--mitwpu-blue);
+    }
+
+    .photo-preview {
+        width: 40px;
+        height: 40px;
+        object-fit: cover;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .photo-preview:hover {
+        transform: scale(1.1);
+    }
+
+    .animate-in {
+        animation: slideUp 0.6s ease-out forwards;
+        opacity: 0;
+    }
+
+    @keyframes slideUp {
+        from { transform: translateY(30px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="history-header">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ url_for('professional.dashboard') }}" class="text-white opacity-75 decoration-none">Dashboard</a></li>
+                    <li class="breadcrumb-item active text-white" aria-current="page">History</li>
+                </ol>
+            </nav>
+        </div>
+        <h1 class="display-5 fw-bold mb-3">Task History</h1>
+        <p class="lead opacity-75">Review all your completed tasks and achievements.</p>
+    </div>
+</section>
+
+<div class="container mb-5">
+    <div class="history-card animate-in pb-2">
+        <div class="card-header bg-white py-4 px-4 border-0 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold">Completed Tasks <span class="badge bg-primary-subtle text-primary ms-2">{{ completed_tickets|length }}</span></h5>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" onclick="window.print()">
+                    <i class="bi bi-printer me-1"></i> Print
+                </button>
+            </div>
+        </div>
+        
+        <div class="table-responsive px-4 pb-4">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Room</th>
+                        <th>Issue Category</th>
+                        <th>Completed Date</th>
+                        <th class="text-center">Complexity</th>
+                        <th class="text-end">Proof</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in completed_tickets %}
+                    <tr>
+                        <td><span class="ticket-id">#{{ ticket.id }}</span></td>
+                        <td>
+                            <div class="fw-bold">Room {{ ticket.room.number }}</div>
+                            <div class="small text-muted">{{ ticket.room.floor.name if ticket.room.floor else '' }}</div>
+                        </td>
+                        <td>
+                            <div class="fw-semibold">{{ ticket.issue_type.replace('_', ' ').title() }}</div>
+                            <div class="small text-muted">{{ ticket.description|truncate(40) }}</div>
+                        </td>
+                        <td>
+                            <div class="fw-bold">{{ ticket.job_completed_at.strftime('%b %d, %Y') if ticket.job_completed_at else 'N/A' }}</div>
+                            <div class="small text-muted">{{ ticket.job_completed_at.strftime('%H:%M') if ticket.job_completed_at else '' }}</div>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge rounded-pill px-3 py-2 
+                                {% if ticket.complexity == 'high' %}bg-danger-subtle text-danger border border-danger
+                                {% elif ticket.complexity == 'medium' %}bg-warning-subtle text-warning border border-warning
+                                {% else %}bg-success-subtle text-success border border-success{% endif %}">
+                                {{ (ticket.complexity or 'low')|title }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% if ticket.completion_photo_filename %}
+                            <a href="{{ url_for('static', filename='uploads/' + ticket.completion_photo_filename) }}" target="_blank">
+                                <img src="{{ url_for('static', filename='uploads/' + ticket.completion_photo_filename) }}" class="photo-preview" alt="Proof">
+                            </a>
+                            {% else %}
+                            <span class="text-muted small">No photo</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="bi bi-archive display-4 opacity-25 d-block mb-3"></i>
+                            <p>No completed tasks found in your history.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

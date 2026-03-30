@@ -7,8 +7,9 @@ from flask import Blueprint, render_template, request, jsonify, session, redirec
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer
 from . import db
-from .models import User
+from .models import User, Professional
 from .email_utils import send_verification_email, send_password_reset_email
+from .file_utils import ALLOWED_EXTENSIONS, allowed_file
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -44,22 +45,56 @@ def user_login_required(f):
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    """Unified login for students and admins."""
+    """Unified login for students, admins, and Job Certified Professionals."""
+    # Redirect if already logged in
     if 'user_id' in session:
         user = User.query.get(session['user_id'])
         if user:
             return redirect(url_for('admin.dashboard')) if user.is_admin else redirect(url_for('main.report_form'))
+    if 'professional_id' in session:
+        return redirect(url_for('professional.dashboard'))
+    
+    # Check for special query parameter to show phone login (for professionals only)
+    show_phone_hint = request.args.get('pro') == '1'
             
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
+        login_input = request.form.get('email', '').strip()
         password = request.form.get('password', '').strip()
         
-        user = User.query.filter_by(email=email).first()
+        # Check if input is a phone number (Indian phone: 10 digits, possibly with +91)
+        cleaned_input = login_input.replace('+91', '').replace('-', '').replace(' ', '')
+        is_phone = cleaned_input.isdigit() and len(cleaned_input) == 10
         
+        # Check if input looks like a username (no @ symbol, not all digits)
+        is_username = '@' not in login_input and not cleaned_input.isdigit()
+        
+        professional = None
+        user = None
+        
+        # Try to find professional first (by phone, username, or email)
+        if is_phone:
+            professional = Professional.query.filter_by(phone=cleaned_input, is_active=True).first()
+        elif is_username:
+            professional = Professional.query.filter_by(username=login_input, is_active=True).first()
+        else:
+            # Try email for both user and professional
+            user = User.query.filter_by(email=login_input).first()
+            if not user:
+                professional = Professional.query.filter_by(email=login_input, is_active=True).first()
+        
+        # Check professional credentials
+        if professional and professional.check_password(password):
+            session['professional_id'] = professional.id
+            session['professional_name'] = professional.name
+            session['professional_category'] = professional.category
+            flash(f'Welcome, {professional.name}!', 'success')
+            return redirect(url_for('professional.dashboard'))
+        
+        # Check user credentials
         if user and user.check_password(password):
             if not user.is_verified:
                 flash('Please verify your email address before logging in.', 'warning')
-                return render_template('login.html')
+                return render_template('login.html', show_phone_hint=show_phone_hint)
                 
             session['user_id'] = user.id
             session['user_name'] = user.name
@@ -69,15 +104,21 @@ def login():
                 return redirect(url_for('admin.dashboard'))
             else:
                 return redirect(url_for('main.report_form'))
+        
+        # Invalid credentials
+        if is_phone:
+            flash('Invalid phone number or password. Note: Phone login is only for Job Certified Professionals.', 'error')
+        elif is_username:
+            flash('Invalid username or password. Note: Username login is only for Job Certified Professionals.', 'error')
         else:
             flash('Invalid email or password.', 'error')
             
-    return render_template('login.html')
+    return render_template('login.html', show_phone_hint=show_phone_hint)
 
 
 @auth_bp.route('/logout')
 def logout():
-    """Logout the current user."""
+    """Logout the current user or professional."""
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('auth.login'))
@@ -211,11 +252,6 @@ def upload_profile_photo():
     import os
     from werkzeug.utils import secure_filename
     from datetime import datetime
-
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-
-    def allowed_file(filename):
-        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
     if 'photo' not in request.files:
         return jsonify({'success': False, 'error': 'No file provided'}), 400

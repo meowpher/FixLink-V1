@@ -1,0 +1,12 @@
+============================================================
+MIT-WPU Vyas Smart-Room Maintenance Tracker
+============================================================
+Server: http://localhost:5000
+Student Portal: http://localhost:5000/report
+Admin Dashboard: http://localhost:5000/admin
+============================================================
+Traceback (most recent call last):
+  File "/home/taha-mustafa/Desktop/FixLink-F/run.py", line 21, in <module>
+    socketio.run(app, host='0.0.0.0', port=port, debug=debug, allow_unsafe_werkzeug=True)
+    ^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'run'

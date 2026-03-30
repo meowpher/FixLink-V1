@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Assign Ticket #{{ ticket.id }} - FixLink Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Assign Ticket #{{ ticket.id }}</h2>
+                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
+            </div>
+            
+            <!-- Ticket Details -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Ticket Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Room:</strong> {{ ticket.room.number if ticket.room else 'N/A' }}</p>
+                            <p><strong>Floor:</strong> {{ ticket.room.floor.name if ticket.room and ticket.room.floor else 'N/A' }}</p>
+                            <p><strong>Issue Type:</strong> {{ ticket.issue_type.replace('_', ' ').title() }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Reported By:</strong> {{ ticket.reporter_name }}</p>
+                            <p><strong>Email:</strong> {{ ticket.reporter_email }}</p>
+                            <p><strong>Created:</strong> {{ ticket.created_at.strftime('%Y-%m-%d %H:%M') if ticket.created_at else 'N/A' }}</p>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <strong>Description:</strong>
+                        <p class="text-muted">{{ ticket.description }}</p>
+                    </div>
+                    {% if ticket.image_filename %}
+                    <div class="mt-3">
+                        <strong>Reported Image:</strong><br>
+                        <a href="{{ url_for('static', filename='uploads/' + ticket.image_filename) }}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                            View Image
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Assignment Form -->
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Select Professional</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-4">
+                            <label class="form-label">Choose Professional Category</label>
+                            
+                            {% if not professionals_by_category %}
+                            <div class="alert alert-warning">
+                                No active professionals available. Please add professionals first.
+                            </div>
+                            {% else %}
+                            <div class="accordion" id="categoryAccordion">
+                                {% for cat_key, cat_data in professionals_by_category.items() %}
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" 
+                                                data-bs-toggle="collapse" data-bs-target="#collapse{{ cat_key }}">
+                                            <span class="badge bg-info me-2">{{ cat_data.professionals|length }}</span>
+                                            {{ cat_data.name }}
+                                        </button>
+                                    </h2>
+                                    <div id="collapse{{ cat_key }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" 
+                                         data-bs-parent="#categoryAccordion">
+                                        <div class="accordion-body">
+                                            <div class="list-group">
+                                                {% for prof in cat_data.professionals %}
+                                                {% set is_busy = prof.id in busy_professional_ids %}
+                                                <label class="list-group-item list-group-item-action {% if is_busy %}bg-busy-prof text-muted opacity-75{% endif %}">
+                                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                                        <div>
+                                                            <input class="form-check-input me-2 professional-radio" type="radio" 
+                                                                   name="professional_id" value="{{ prof.id }}" required
+                                                                   {% if is_busy %}disabled{% endif %}>
+                                                            <strong class="{% if is_busy %}text-decoration-line-through{% endif %}">{{ prof.name }}</strong>
+                                                            {% if is_busy %}
+                                                            <span class="badge bg-danger ms-2"><i class="bi bi-clock-history me-1"></i> BUSY</span>
+                                                            {% endif %}
+                                                            <p class="mb-0 text-muted small">{{ prof.email }}</p>
+                                                            {% if prof.phone %}
+                                                            <p class="mb-0 text-muted small">{{ prof.phone }}</p>
+                                                            {% endif %}
+                                                        </div>
+                                                        <span class="badge {% if is_busy %}bg-secondary{% else %}bg-primary{% endif %}">{{ category_names.get(prof.category, prof.category) }}</span>
+                                                    </div>
+                                                </label>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="time_limit_hours" class="form-label">Time Limit (Hours) *</label>
+                            <input type="number" class="form-control form-control-lg" id="time_limit_hours" 
+                                   name="time_limit_hours" min="1" max="168" required placeholder="e.g., 4">
+                            <div class="form-text">
+                                Set the deadline for completing this task. Common times: 2-4 hours for simple tasks, 8 hours for complex ones.
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-success btn-lg" {% if not professionals_by_category %}disabled{% endif %}>
+                                Assign Ticket
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Update styling when a professional is selected
+        const radios = document.querySelectorAll('.professional-radio');
+        radios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                // Remove active class from all items
+                document.querySelectorAll('.list-group-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                // Add active class to selected item
+                if (this.checked) {
+                    this.closest('.list-group-item').classList.add('active');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

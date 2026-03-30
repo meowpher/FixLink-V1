@@ -126,6 +126,16 @@ def create_vyas_data():
                     {'suffix': '15', 'type': Room.ROOM_TYPE_WASHROOM, 'name': 'Washroom'},
                     {'suffix': '08', 'type': Room.ROOM_TYPE_WASHROOM, 'name': 'Washroom'},
                     {'suffix': '07', 'type': Room.ROOM_TYPE_WASHROOM, 'name': 'Washroom'},
+                    
+                    # Lifts (8)
+                    {'suffix': 'Lift1', 'type': 'lift', 'name': 'Lift 1'},
+                    {'suffix': 'Lift2', 'type': 'lift', 'name': 'Lift 2'},
+                    {'suffix': 'Lift3', 'type': 'lift', 'name': 'Lift 3'},
+                    {'suffix': 'Lift4', 'type': 'lift', 'name': 'Lift 4'},
+                    {'suffix': 'Lift5', 'type': 'lift', 'name': 'Lift 5'},
+                    {'suffix': 'Lift6', 'type': 'lift', 'name': 'Lift 6'},
+                    {'suffix': 'Lift7', 'type': 'lift', 'name': 'Lift 7'},
+                    {'suffix': 'Lift8', 'type': 'lift', 'name': 'Lift 8'},
                 ]
                 
                 for tmpl in room_templates:
@@ -177,6 +187,16 @@ def create_vyas_data():
                     
                     # Bottom Right
                     {'suffix': '07', 'type': 'breakout', 'name': 'Breakout Area 007'},
+                    
+                    # Lifts (8)
+                    {'suffix': 'Lift1', 'type': 'lift', 'name': 'Lift 1'},
+                    {'suffix': 'Lift2', 'type': 'lift', 'name': 'Lift 2'},
+                    {'suffix': 'Lift3', 'type': 'lift', 'name': 'Lift 3'},
+                    {'suffix': 'Lift4', 'type': 'lift', 'name': 'Lift 4'},
+                    {'suffix': 'Lift5', 'type': 'lift', 'name': 'Lift 5'},
+                    {'suffix': 'Lift6', 'type': 'lift', 'name': 'Lift 6'},
+                    {'suffix': 'Lift7', 'type': 'lift', 'name': 'Lift 7'},
+                    {'suffix': 'Lift8', 'type': 'lift', 'name': 'Lift 8'},
                 ]
                 
                 for config in gf_rooms:

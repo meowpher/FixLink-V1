@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Add Professional - Developer Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-tools me-2"></i>Add Job Certified Professional</h2>
+                <a href="{{ url_for('superadmin.dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
+            </div>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Professional Information</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="name" class="form-label">Full Name *</label>
+                                <input type="text" class="form-control" id="name" name="name" required 
+                                       value="{{ form_data.name if form_data else '' }}">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="username" class="form-label">Username *</label>
+                                <input type="text" class="form-control" id="username" name="username" required
+                                       value="{{ form_data.username if form_data else '' }}">
+                                <div class="form-text">Used for login. Must be unique.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="phone" class="form-label">Phone Number (Indian)</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" placeholder="e.g., 9876543210"
+                                       value="{{ form_data.phone if form_data else '' }}">
+                                <div class="form-text">Professionals can log in with phone number. Optional.</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="email" name="email"
+                                       value="{{ form_data.email if form_data else '' }}">
+                                <div class="form-text">Optional. For notifications only.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="category" class="form-label">Category *</label>
+                                <select class="form-select" id="category" name="category" required>
+                                    <option value="">Select Category</option>
+                                    {% for cat in categories %}
+                                    <option value="{{ cat }}" {% if form_data and form_data.category == cat %}selected{% endif %}>
+                                        {{ category_names.get(cat, cat) }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="password" class="form-label">Password *</label>
+                                <input type="password" class="form-control" id="password" name="password" required minlength="8">
+                                <div class="form-text">At least 8 characters.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Note:</strong> Job Certified Professionals can log in using their:
+                            <ul class="mb-0 mt-2">
+                                <li>Username (e.g., <code>rahul_it</code>)</li>
+                                <li>Phone number (e.g., <code>9876543210</code>)</li>
+                            </ul>
+                            This is not shown to regular users.
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('superadmin.dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-success">Create Professional</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Category Guide -->
+            <div class="card mt-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Category Guide</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-start mb-3">
+                                <span class="badge bg-primary me-2 p-2">IT</span>
+                                <div>
+                                    <strong>IT Technician</strong>
+                                    <p class="mb-0 text-muted small">Computers, projectors, networks, AV equipment</p>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-start mb-3">
+                                <span class="badge bg-warning text-dark me-2 p-2">Elec</span>
+                                <div>
+                                    <strong>Electrician</strong>
+                                    <p class="mb-0 text-muted small">Electrical, lighting, wiring, AC issues</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-start mb-3">
+                                <span class="badge bg-info me-2 p-2">Plum</span>
+                                <div>
+                                    <strong>Plumber</strong>
+                                    <p class="mb-0 text-muted small">Plumbing, water, drainage, washrooms</p>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-start">
+                                <span class="badge bg-secondary me-2 p-2">Carp</span>
+                                <div>
+                                    <strong>Carpenter</strong>
+                                    <p class="mb-0 text-muted small">Furniture, benches, doors, woodwork</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

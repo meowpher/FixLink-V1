@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Professionals - Developer Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-tools me-2"></i>Job Certified Professionals</h2>
+        <div>
+            <a href="{{ url_for('superadmin.add_professional') }}" class="btn btn-success">
+                <i class="bi bi-plus-lg me-2"></i>Add New Professional
+            </a>
+            <a href="{{ url_for('superadmin.dashboard') }}" class="btn btn-outline-secondary ms-2">
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Username</th>
+                            <th>Phone</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prof in professionals %}
+                        <tr id="prof-row-{{ prof.id }}">
+                            <td>{{ prof.id }}</td>
+                            <td>{{ prof.name }}</td>
+                            <td><code>{{ prof.username }}</code></td>
+                            <td>{{ prof.phone or '-' }}</td>
+                            <td>
+                                <span class="badge bg-info">{{ category_names.get(prof.category, prof.category) }}</span>
+                            </td>
+                            <td>
+                                {% if prof.is_active %}
+                                <span class="badge bg-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ prof.created_at.strftime('%Y-%m-%d') if prof.created_at else '-' }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="editProfessional({{ prof.id }}, '{{ prof.name }}', '{{ prof.username }}', '{{ prof.phone or '' }}', '{{ prof.email or '' }}', '{{ prof.category }}')">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="toggleStatus({{ prof.id }})">
+                                    {% if prof.is_active %}
+                                    <i class="bi bi-pause"></i>
+                                    {% else %}
+                                    <i class="bi bi-play"></i>
+                                    {% endif %}
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteProfessional({{ prof.id }})">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">
+                                <i class="bi bi-inbox display-4"></i>
+                                <p class="mt-3">No professionals found</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Professional Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Professional</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-id">
+                <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <input type="text" class="form-control" id="edit-name" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-control" id="edit-username" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Phone</label>
+                    <input type="tel" class="form-control" id="edit-phone">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" id="edit-email">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Category</label>
+                    <select class="form-select" id="edit-category">
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ category_names.get(cat, cat) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">New Password (leave blank to keep current)</label>
+                    <input type="password" class="form-control" id="edit-password">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveProfessional()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function deleteProfessional(profId) {
+        if (!confirm('Are you sure you want to delete this professional? This action cannot be undone.')) {
+            return;
+        }
+        
+        fetch(`/developer/api/professional/${profId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById(`prof-row-${profId}`).remove();
+                alert('Professional deleted successfully');
+            } else {
+                alert('Error: ' + (data.error || 'Failed to delete professional'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred');
+        });
+    }
+    
+    function toggleStatus(profId) {
+        fetch(`/developer/api/professional/${profId}/toggle-status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to toggle status'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred');
+        });
+    }
+    
+    // Edit Professional Modal
+    let editModal;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        editModal = new bootstrap.Modal(document.getElementById('editModal'));
+    });
+    
+    function editProfessional(id, name, username, phone, email, category) {
+        document.getElementById('edit-id').value = id;
+        document.getElementById('edit-name').value = name;
+        document.getElementById('edit-username').value = username;
+        document.getElementById('edit-phone').value = phone;
+        document.getElementById('edit-email').value = email;
+        document.getElementById('edit-category').value = category;
+        document.getElementById('edit-password').value = '';
+        
+        editModal.show();
+    }
+    
+    function saveProfessional() {
+        const id = document.getElementById('edit-id').value;
+        const data = {
+            name: document.getElementById('edit-name').value,
+            username: document.getElementById('edit-username').value,
+            phone: document.getElementById('edit-phone').value,
+            email: document.getElementById('edit-email').value,
+            category: document.getElementById('edit-category').value
+        };
+        
+        const password = document.getElementById('edit-password').value;
+        if (password) {
+            data.password = password;
+        }
+        
+        fetch(`/developer/api/professional/${id}/edit`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                editModal.hide();
+                location.reload();
+            } else {
+                alert('Error: ' + (result.error || 'Failed to save changes'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred');
+        });
+    }
+</script>
+{% endblock %}
