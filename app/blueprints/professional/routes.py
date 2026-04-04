@@ -9,20 +9,10 @@ from werkzeug.utils import secure_filename
 from ... import db
 from ...models import Professional, Ticket, HelpRequest, ChatMessage, Room, Asset, User, Notification
 from ...utils import allowed_file
+from ...decorators import professional_login_required
+from ...api_utils import handle_api_errors, api_response
 
 professional_bp = Blueprint('professional', __name__, url_prefix='/professional')
-
-
-def professional_login_required(f):
-    """Decorator to require professional login."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'professional_id' not in session:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'errors': ['Session expired. Please log in again.']}), 401
-            return redirect(url_for('professional.login'))
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 @professional_bp.route('/login', methods=['GET', 'POST'])
@@ -108,7 +98,8 @@ def dashboard():
                          assigned_tickets=assigned_tickets,
                          completed_tickets=completed_tickets,
                          help_requests=help_requests,
-                         complexity_choices=Ticket.COMPLEXITY_CHOICES)
+                         complexity_choices=Ticket.COMPLEXITY_CHOICES,
+                         vapid_public_key=os.environ.get('VAPID_PUBLIC_KEY', ''))
 
 
 @professional_bp.route('/chat')
@@ -179,23 +170,20 @@ def task_detail(ticket_id):
 
 @professional_bp.route('/api/task/<int:ticket_id>/start', methods=['POST'])
 @professional_login_required
+@handle_api_errors
 def start_task(ticket_id):
     """Start a task - update status and notify admin."""
     professional = Professional.query.get(session['professional_id'])
     ticket = Ticket.query.get_or_404(ticket_id)
     
     if ticket.assigned_professional_id != professional.id:
-        return jsonify({'success': False, 'error': 'Not authorized - ticket not assigned to you'}), 403
+        return api_response(success=False, error='Not authorized - ticket not assigned to you', status=403)
     
-    # Debug info
     current_status = ticket.status
     expected_status = Ticket.STATUS_ASSIGNED
     
     if current_status != expected_status:
-        return jsonify({
-            'success': False, 
-            'error': f'Task is not in assigned state. Current status: {current_status}, Expected: {expected_status}'
-        }), 400
+        return api_response(success=False, error=f'Task is not in assigned state. Current status: {current_status}, Expected: {expected_status}', status=400)
 
     # Ensure professional doesn't have another job in progress
     active_task = Ticket.query.filter(
@@ -205,42 +193,43 @@ def start_task(ticket_id):
     ).first()
     
     if active_task:
-        return jsonify({
-            'success': False, 
-            'error': f'You already have an active task in progress (# {active_task.id}). Please complete or cancel it first.'
-        }), 400
+        return api_response(success=False, error=f'You already have an active task in progress (# {active_task.id}). Please complete or cancel it first.', status=400)
     
+    ticket.status = Ticket.STATUS_IN_PROGRESS
+    ticket.job_started_at = datetime.utcnow()
+    db.session.commit()
+    
+    # Notify admin via notification system
+    from ...socket_events import notify_admin_job_started
+    notify_admin_job_started(ticket, professional)
+    
+    # Notify reporter via EmailJS (Best effort)
+    from ...utils import send_ticket_email
     try:
-        ticket.status = Ticket.STATUS_IN_PROGRESS
-        ticket.job_started_at = datetime.utcnow()
-        db.session.commit()
-        
-        # Notify admin via notification system
-        from .socket_events import notify_admin_job_started
-        notify_admin_job_started(ticket, professional)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Job started successfully',
-            'job_started_at': ticket.job_started_at.isoformat()
-        })
+        send_ticket_email(ticket, action='in-progress')
     except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        current_app.logger.error(f"Email failed: {str(e)}")
+    
+    return api_response(
+        success=True,
+        message='Job started successfully',
+        job_started_at=ticket.job_started_at.isoformat()
+    )
 
 
 @professional_bp.route('/api/task/<int:ticket_id>/complete', methods=['POST'])
 @professional_login_required
+@handle_api_errors
 def complete_task(ticket_id):
     """Complete a task - upload photo and notify admin."""
     professional = Professional.query.get(session['professional_id'])
     ticket = Ticket.query.get_or_404(ticket_id)
     
     if ticket.assigned_professional_id != professional.id:
-        return jsonify({'success': False, 'error': 'Not authorized'}), 403
+        return api_response(success=False, error="Not authorized", status=403)
     
     if ticket.status != Ticket.STATUS_IN_PROGRESS:
-        return jsonify({'success': False, 'error': 'Task must be in progress to complete'}), 400
+        return api_response(success=False, error="Task must be in progress to complete", status=400)
     
     # Handle photo upload
     completion_photo = None
@@ -254,157 +243,128 @@ def complete_task(ticket_id):
             file.save(file_path)
             completion_photo = filename
     
-    try:
-        ticket.status = Ticket.STATUS_FIXED
-        ticket.job_completed_at = datetime.utcnow()
-        ticket.completion_photo_filename = completion_photo
-        ticket.fixed_at = datetime.utcnow()
-        
-        # Mark asset as working if applicable
-        if ticket.asset_id:
-            asset = Asset.query.get(ticket.asset_id)
-            if asset:
-                asset.status = Asset.STATUS_WORKING
-        
-        db.session.commit()
-        
-        # Notify admin
-        from .socket_events import notify_admin_job_completed
-        notify_admin_job_completed(ticket, professional)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Job completed successfully',
-            'job_completed_at': ticket.job_completed_at.isoformat()
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    ticket.status = Ticket.STATUS_FIXED
+    ticket.job_completed_at = datetime.utcnow()
+    ticket.completion_photo_filename = completion_photo
+    ticket.fixed_at = datetime.utcnow()
+    
+    # Mark asset as working if applicable
+    if ticket.asset_id:
+        asset = Asset.query.get(ticket.asset_id)
+        if asset:
+            asset.status = Asset.STATUS_WORKING
+    
+    db.session.commit()
+    
+    # Notify admin
+    from ...socket_events import notify_admin_job_completed
+    notify_admin_job_completed(ticket, professional)
+    
+    # Notify reporter via EmailJS
+    from ...utils import send_ticket_email
+    send_ticket_email(ticket, action='fixed')
+    
+    return api_response(
+        data={'job_completed_at': ticket.job_completed_at.isoformat()},
+        message="Job completed successfully"
+    )
 
 
 @professional_bp.route('/api/task/<int:ticket_id>/cancel', methods=['POST'])
 @professional_login_required
+@handle_api_errors
 def cancel_task(ticket_id):
     """Cancel a task with reason - limited tracking per day."""
     professional = Professional.query.get(session['professional_id'])
     ticket = Ticket.query.get_or_404(ticket_id)
     
     if ticket.assigned_professional_id != professional.id:
-        return jsonify({'success': False, 'error': 'Not authorized'}), 403
+        return api_response(success=False, error="Not authorized", status=403)
     
     if ticket.status not in [Ticket.STATUS_ASSIGNED, Ticket.STATUS_IN_PROGRESS]:
-        return jsonify({'success': False, 'error': 'Cannot cancel this task'}), 400
+        return api_response(success=False, error="Cannot cancel this task", status=400)
     
-    data = request.get_json()
+    from ...api_utils import validate_json
+    data, error = validate_json(['reason'])
+    if error: return error
     reason = data.get('reason', '').strip()
     
-    if not reason:
-        return jsonify({'success': False, 'error': 'Cancellation reason is required'}), 400
+    ticket.status = Ticket.STATUS_CANCELLED
+    ticket.cancellation_reason = reason
+    ticket.cancelled_at = datetime.utcnow()
+    ticket.cancelled_by_professional_id = professional.id
     
-    try:
-        ticket.status = Ticket.STATUS_CANCELLED
-        ticket.cancellation_reason = reason
-        ticket.cancelled_at = datetime.utcnow()
-        ticket.cancelled_by_professional_id = professional.id
-        
-        # Unassign the professional
-        ticket.assigned_professional_id = None
-        
-        # Create persistent notifications for all admins
-        admins = User.query.filter_by(is_admin=True).all()
-        for admin in admins:
-            notif = Notification(
-                user_id=admin.id,
-                title="Job Cancelled",
-                message=f"Technician {professional.name} cancelled job for room {ticket.room.number if ticket.room else 'Unknown'}. Reason: {reason}",
-                type=Notification.TYPE_CANCELLATION,
-                link=f"/admin/?ticket_id={ticket.id}"
-            )
-            db.session.add(notif)
-            
-        db.session.commit()
-        
-        # Notify admin via SocketIO
-        from .socket_events import notify_admin_job_cancelled
-        notify_admin_job_cancelled(ticket, professional, reason)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Job cancelled successfully. Admin will reassign.',
-            'cancelled_at': ticket.cancelled_at.isoformat()
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    # Unassign the professional
+    ticket.assigned_professional_id = None
+    db.session.commit()
+    
+    # Notify admin via Socket.IO, WebPush and Persistent Notification
+    from ...socket_events import notify_admin_job_cancelled
+    notify_admin_job_cancelled(ticket, professional, reason)
+    
+    return api_response(
+        data={'cancelled_at': ticket.cancelled_at.isoformat()},
+        message="Job cancelled successfully. Admin will reassign."
+    )
 
 
 @professional_bp.route('/api/task/<int:ticket_id>/complexity', methods=['POST'])
 @professional_login_required
+@handle_api_errors
 def set_complexity(ticket_id):
     """Set task complexity (Low/Medium/High)."""
     professional = Professional.query.get(session['professional_id'])
     ticket = Ticket.query.get_or_404(ticket_id)
     
     if ticket.assigned_professional_id != professional.id:
-        return jsonify({'success': False, 'error': 'Not authorized'}), 403
+        return api_response(success=False, error="Not authorized", status=403)
     
     data = request.get_json()
     complexity = data.get('complexity')
     
     if complexity not in Ticket.COMPLEXITY_CHOICES:
-        return jsonify({'success': False, 'error': 'Invalid complexity level'}), 400
+        return api_response(success=False, error="Invalid complexity level", status=400)
     
-    try:
-        ticket.complexity = complexity
-        db.session.commit()
-        return jsonify({
-            'success': True,
-            'message': f'Complexity set to {complexity}'
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    ticket.complexity = complexity
+    db.session.commit()
+    return api_response(message=f"Complexity set to {complexity}")
 
 
 # Help Request Endpoints
 
 @professional_bp.route('/api/task/<int:ticket_id>/request-help', methods=['POST'])
 @professional_login_required
+@handle_api_errors
 def request_help(ticket_id):
     """Request help from another professional - goes to admin for approval."""
     professional = Professional.query.get(session['professional_id'])
     ticket = Ticket.query.get_or_404(ticket_id)
     
     if ticket.assigned_professional_id != professional.id:
-        return jsonify({'success': False, 'error': 'Not authorized'}), 403
+        return api_response(success=False, error="Not authorized", status=403)
     
-    data = request.get_json()
+    from ...api_utils import validate_json
+    data, error = validate_json(['message'])
+    if error: return error
     message = data.get('message', '').strip()
-    helper_category = data.get('helper_category')  # Optional: preferred helper category
     
-    # Create help request (pending admin approval)
-    try:
-        help_request = HelpRequest(
-            ticket_id=ticket_id,
-            requester_professional_id=professional.id,
-            message=message,
-            status=HelpRequest.STATUS_PENDING
-        )
-        db.session.add(help_request)
-        db.session.commit()
-        
-        # Notify admin
-        from .socket_events import notify_admin_help_requested
-        notify_admin_help_requested(help_request, professional, ticket)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Help request submitted for admin approval',
-            'help_request_id': help_request.id
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    help_request = HelpRequest(
+        ticket_id=ticket_id,
+        requester_professional_id=professional.id,
+        message=message,
+        status=HelpRequest.STATUS_PENDING
+    )
+    db.session.add(help_request)
+    db.session.commit()
+    
+    # Notify admin
+    from ...socket_events import notify_admin_help_requested
+    notify_admin_help_requested(help_request, professional, ticket)
+    
+    return api_response(
+        data={'help_request_id': help_request.id},
+        message="Help request submitted for admin approval"
+    )
 
 
 # Chat Endpoints
@@ -458,7 +418,7 @@ def send_chat_message():
         db.session.commit()
         
         # Emit via WebSocket
-        from .socket_events import emit_chat_message
+        from ...socket_events import emit_chat_message
         emit_chat_message(chat_message)
         
         return jsonify({
@@ -472,32 +432,26 @@ def send_chat_message():
 
 @professional_bp.route('/api/task/<int:ticket_id>')
 @professional_login_required
+@handle_api_errors
 def get_task_detail_api(ticket_id):
     """Get task details via API."""
     professional = Professional.query.get(session['professional_id'])
     ticket = Ticket.query.get_or_404(ticket_id)
     
     if ticket.assigned_professional_id != professional.id:
-        return jsonify({'success': False, 'error': 'Not authorized'}), 403
-    return jsonify({
-        'success': True,
-        'ticket': ticket.to_dict()
-    })
+        return api_response(success=False, error="Not authorized", status=403)
+    return api_response(data={'ticket': ticket.to_dict()})
 
 
 @professional_bp.route('/api/chat/reset', methods=['POST'])
 @professional_login_required
+@handle_api_errors
 def reset_chat_history():
     """Clear chat history for the current professional."""
     prof_id = session['professional_id']
-    try:
-        # Delete all messages where this professional is sender or receiver
-        ChatMessage.query.filter(
-            ((ChatMessage.sender_type == ChatMessage.SENDER_TYPE_PROFESSIONAL) & (ChatMessage.sender_id == prof_id)) |
-            ((ChatMessage.receiver_type == ChatMessage.SENDER_TYPE_PROFESSIONAL) & (ChatMessage.receiver_id == prof_id))
-        ).delete(synchronize_session=False)
-        db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    ChatMessage.query.filter(
+        ((ChatMessage.sender_type == ChatMessage.SENDER_TYPE_PROFESSIONAL) & (ChatMessage.sender_id == prof_id)) |
+        ((ChatMessage.receiver_type == ChatMessage.SENDER_TYPE_PROFESSIONAL) & (ChatMessage.receiver_id == prof_id))
+    ).delete(synchronize_session=False)
+    db.session.commit()
+    return api_response(message="Chat history reset successfully")

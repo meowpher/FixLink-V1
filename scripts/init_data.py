@@ -10,6 +10,8 @@ This script creates the Vyas building with:
 """
 import sys
 import os
+from datetime import datetime, timedelta
+import random
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -265,7 +267,9 @@ def create_vyas_data():
                     room_id=room.id,
                     name=asset_data['name'],
                     asset_type=asset_data['type'],
-                    status=Asset.STATUS_WORKING
+                    status=Asset.STATUS_WORKING,
+                    # Random installation date between 0 and 5 years ago
+                    installation_date=datetime.utcnow() - timedelta(days=random.randint(0, 365 * 5))
                 )
                 db.session.add(asset)
             

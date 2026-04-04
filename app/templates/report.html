@@ -113,6 +113,7 @@
 
                     <form id="reportForm" method="POST" action="{{ url_for('main.submit_report') }}"
                         enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <!-- Hidden Room Selection -->
                         <input type="hidden" id="room_id" name="room_id" value="{{ selected_room or '' }}">
 
@@ -173,4 +174,5 @@
     const preSelectedRoom = {{ selected_room|default('null')|tojson|safe }};
     const preSelectedRoomNumber = '{{ room_param|default('') }}';
 </script>
+<script type="module" src="{{ url_for('static', filename='js/modules/main.js') }}"></script>
 {% endblock %}

@@ -7,17 +7,17 @@ import secrets
 import logging
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from dotenv import load_dotenv
 from .socket_events import init_socketio
 
-# SocketIO instance (will be initialized in create_app)
-socketio = None
-
-# Load environment variables from .env file
-load_dotenv()
-
-logger = logging.getLogger(__name__)
+# Core instances
 db = SQLAlchemy()
+migrate = Migrate()
+
+# Load environment variables
+load_dotenv()
+logger = logging.getLogger(__name__)
 
 
 def create_app(config_name=None):
@@ -35,10 +35,25 @@ def create_app(config_name=None):
             'Sessions will not persist across server restarts. Set SECRET_KEY in your .env file.'
         )
     app.config['SECRET_KEY'] = secret_key
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
-        'DATABASE_URL', 'sqlite:///vyas_tracker.db'
-    )
+    
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url:
+        logger.warning(
+            'DATABASE_URL is not set. Falling back to local SQLite. '
+            'Set DATABASE_URL in your .env file for production.'
+        )
+        database_url = 'sqlite:///vyas_tracker.db'
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
+    # PostgreSQL connection pool settings (ignored by SQLite)
+    if database_url.startswith('postgresql'):
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_size': 5,
+            'pool_recycle': 300,
+            'pool_pre_ping': True,
+        }
+    
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
     
@@ -47,6 +62,26 @@ def create_app(config_name=None):
     
     # Initialize extensions
     db.init_app(app)
+    migrate.init_app(app, db)
+    
+    # Initialize Cache
+    from .cache import init_cache
+    init_cache(app)
+    
+    # Security: CSRF Protection
+    from flask_wtf.csrf import CSRFProtect
+    csrf = CSRFProtect()
+    csrf.init_app(app)
+    
+    # Security: Rate Limiting
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    limiter = Limiter(
+        key_func=get_remote_address,
+        app=app,
+        default_limits=["1000 per day", "100 per hour"],
+        storage_uri="memory://",
+    )
     
     # Initialize SocketIO
     global socketio
@@ -68,6 +103,22 @@ def create_app(config_name=None):
     # Initialize database and run migrations
     from .database import init_db
     init_db(app)
+    
+    # Start background scheduler for automated alerts
+    from .scheduler import start_scheduler
+    start_scheduler(app)
+    
+    # Global Session Refresh Hook
+    @app.before_request
+    def refresh_user_session():
+        from flask import session
+        from .models import User
+        if 'user_id' in session and not session.get('is_super_admin'):
+            user = User.query.get(session['user_id'])
+            if user:
+                # Sync critical flags
+                session['is_admin'] = user.is_admin
+                session['user_role'] = user.role
     
     # Register Jinja filters
     @app.template_filter('ist')

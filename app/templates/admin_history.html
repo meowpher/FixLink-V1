@@ -30,19 +30,28 @@
 <!-- Filters -->
 <section class="filters-section">
     <div class="container">
-        <div class="filter-card">
+        <form action="{{ url_for('admin.history') }}" method="GET" class="filter-card">
             <div class="row g-3 align-items-end">
-                <div class="col-md-12">
-                    <label for="search" class="form-label">Live Search by Name, PRN, or Email</label>
+                <div class="col-md-10">
+                    <label for="search" class="form-label">Search by Name, PRN, or Email</label>
                     <div class="input-group">
                         <span class="input-group-text bg-white border-end-0">
                             <i class="bi bi-search text-muted"></i>
                         </span>
-                        <input type="text" class="form-control border-start-0 ps-0" id="search" placeholder="Start typing to filter records instantly...">
+                        <input type="text" name="search" class="form-control border-start-0 ps-0" id="search" 
+                               value="{{ search_query }}" placeholder="Search historical records...">
                     </div>
                 </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-filter me-1"></i>Search
+                    </button>
+                    {% if search_query %}
+                    <a href="{{ url_for('admin.history') }}" class="btn btn-link btn-sm w-100 text-decoration-none mt-1">Clear</a>
+                    {% endif %}
+                </div>
             </div>
-        </div>
+        </form>
     </div>
 </section>
 
@@ -54,7 +63,9 @@
                 <h5 class="mb-0 text-success">
                     <i class="bi bi-check-circle me-2"></i>Fixed Tickets
                 </h5>
-                <span class="badge bg-success">{{ tickets|length }}</span>
+                <span class="badge bg-success">
+                    {% if pagination %}{{ pagination.total }}{% else %}{{ tickets|length }}{% endif %} Total
+                </span>
             </div>
 
             <div class="table-responsive">
@@ -143,6 +154,39 @@
                 </table>
             </div>
 
+            <!-- Pagination Controls -->
+            {% if pagination and pagination.pages > 1 %}
+            <div class="card-footer bg-white border-top-0 py-3">
+                <nav aria-label="History pagination">
+                    <ul class="pagination justify-content-center mb-0">
+                        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                            <a class="page-link" href="{{ url_for('admin.history', page=pagination.prev_num, search=search_query) if pagination.has_prev else '#' }}" tabindex="-1">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                        </li>
+                        
+                        {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                            {% if page_num %}
+                                <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                                    <a class="page-link" href="{{ url_for('admin.history', page=page_num, search=search_query) }}">{{ page_num }}</a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                            {% endif %}
+                        {% endfor %}
+
+                        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                            <a class="page-link" href="{{ url_for('admin.history', page=pagination.next_num, search=search_query) if pagination.has_next else '#' }}">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+                <div class="text-center mt-2 small text-muted">
+                    Showing {{ pagination.items|length }} of {{ pagination.total }} records (Page {{ pagination.page }} of {{ pagination.pages }})
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </section>

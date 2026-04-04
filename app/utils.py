@@ -188,3 +188,50 @@ def send_password_reset_email(email, name, reset_link):
     except Exception as e:
         logger.error(f"ERROR: Exception sending reset email to {email}: {str(e)}")
         return False
+
+# ==============================================================================
+# Web Push Utilities
+# ==============================================================================
+
+def send_web_push(user_id=None, professional_id=None, title="New Notification", body="", url="/"):
+    """
+    Sends a Web Push notification to a specific user or professional using pywebpush.
+    """
+    try:
+        from pywebpush import webpush, WebPushException
+        from .models import PushSubscription
+        
+        vapid_private_key = os.environ.get('VAPID_PRIVATE_KEY')
+        vapid_claims = {"sub": os.environ.get('VAPID_SUBJECT', 'mailto:admin@fixlink.edu')}
+        
+        if not vapid_private_key:
+            logger.warning("VAPID_PRIVATE_KEY not found. Skipping Web Push dispatch.")
+            return False
+            
+        subs = []
+        if user_id:
+            subs = PushSubscription.query.filter_by(user_id=user_id).all()
+        elif professional_id:
+            subs = PushSubscription.query.filter_by(professional_id=professional_id).all()
+            
+        success = True
+        for sub in subs:
+            try:
+                webpush(
+                    subscription_info=sub.to_dict(),
+                    data=json.dumps({"title": title, "body": body, "url": url}),
+                    vapid_private_key=vapid_private_key,
+                    vapid_claims=vapid_claims
+                )
+            except WebPushException as ex:
+                logger.error(f"WebPushException: {repr(ex)}")
+                # If Gone (unsubscribed), remove from DB
+                if ex.response and ex.response.status_code == 410:
+                    from . import db
+                    db.session.delete(sub)
+                    db.session.commit()
+                success = False
+        return success
+    except Exception as e:
+        logger.error(f"Failed to trigger web push: {e}")
+        return False

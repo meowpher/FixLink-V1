@@ -1,29 +1,25 @@
 """
-Super Admin Routes - Developer Dashboard for managing admins and professionals
-Accessible only with hardcoded credentials:
-Email: taha.piplodwala@mitwpu.edu.in
-Password: Taha10vesgono!
+Super Admin Routes - Developer Dashboard for managing admins and professionals.
+Accessible with environment-configured credentials.
 """
 from functools import wraps
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from ... import db
 from ...models import User, Professional
+from ...decorators import super_admin_required
 
 superadmin_bp = Blueprint('superadmin', __name__)
 
-# Hardcoded super admin credentials
-SUPER_ADMIN_EMAIL = 'taha.piplodwala@mitwpu.edu.in'
-SUPER_ADMIN_PASSWORD_HASH = generate_password_hash('Taha10vesgono!')
+import os
 
-def super_admin_required(f):
-    """Decorator to require super admin login."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('is_super_admin'):
-            return redirect(url_for('superadmin.login'))
-        return f(*args, **kwargs)
-    return decorated_function
+# Super admin credentials from environment
+SUPER_ADMIN_EMAIL = os.environ.get('SUPER_ADMIN_EMAIL', 'taha.piplodwala@mitwpu.edu.in')
+SUPER_ADMIN_PASSWORD = os.environ.get('SUPER_ADMIN_PASSWORD', 'Taha10vesgono!')
+
+def check_super_admin(email, password):
+    """Check if provided credentials match super admin."""
+    return email == SUPER_ADMIN_EMAIL and password == SUPER_ADMIN_PASSWORD
 
 
 @superadmin_bp.route('/developer/login', methods=['GET', 'POST'])
@@ -36,9 +32,17 @@ def login():
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '').strip()
         
-        if email == SUPER_ADMIN_EMAIL and check_password_hash(SUPER_ADMIN_PASSWORD_HASH, password):
+        if check_super_admin(email, password):
             session['is_super_admin'] = True
             session['super_admin_email'] = email
+            
+            # Also sign in as regular user if they exist in DB (to avoid confusion in navbar/decorators)
+            user = User.query.filter_by(email=email).first()
+            if user:
+                session['user_id'] = user.id
+                session['user_name'] = user.name
+                session['is_admin'] = user.is_admin
+            
             flash('Welcome, Developer!', 'success')
             return redirect(url_for('superadmin.dashboard'))
         else:
@@ -63,10 +67,20 @@ def dashboard():
     # Get counts
     admin_count = User.query.filter_by(is_admin=True).count()
     professional_count = Professional.query.filter_by(is_active=True).count()
+    user_count = User.query.count()
     
     return render_template('superadmin/dashboard.html',
                          admin_count=admin_count,
-                         professional_count=professional_count)
+                         professional_count=professional_count,
+                         user_count=user_count)
+
+
+@superadmin_bp.route('/developer/users')
+@super_admin_required
+def list_users():
+    """List all registered users for management."""
+    users = User.query.order_by(User.created_at.desc()).all()
+    return render_template('superadmin/list_users.html', users=users, roles=User.ROLES)
 
 
 # ==================== ADD NEW ADMIN ====================
@@ -102,6 +116,7 @@ def add_admin():
             admin_user = User(
                 name=name,
                 email=email,
+                role=User.ROLE_ADMIN,
                 is_admin=True,
                 is_verified=True
             )
@@ -251,7 +266,7 @@ def delete_professional(prof_id):
     professional = Professional.query.get_or_404(prof_id)
     
     # Check if professional has assigned tickets
-    from .models import Ticket
+    from ...models import Ticket
     assigned_tickets = Ticket.query.filter_by(
         assigned_professional_id=prof_id
     ).filter(
@@ -357,3 +372,64 @@ def edit_professional(prof_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+@superadmin_bp.route('/developer/api/user/<int:user_id>/delete', methods=['POST'])
+@super_admin_required
+def delete_user(user_id):
+    """Delete a standard user."""
+    from ...api_utils import api_response
+    user = User.query.get_or_404(user_id)
+    
+    if user.email == SUPER_ADMIN_EMAIL:
+        return api_response(success=False, error="Cannot delete super admin", status=403)
+        
+    try:
+        db.session.delete(user)
+        db.session.commit()
+        return api_response(message=f"User {user.name} deleted successfully")
+    except Exception as e:
+        db.session.rollback()
+        return api_response(success=False, error=str(e), status=500)
+
+
+@superadmin_bp.route('/developer/api/user/<int:user_id>/update-role', methods=['POST'])
+@super_admin_required
+def update_user_role(user_id):
+    """Update user role and admin status."""
+    from ...api_utils import api_response, validate_json
+    user = User.query.get_or_404(user_id)
+    data, error = validate_json(['role'])
+    if error: return error
+    
+    new_role = data.get('role')
+    if new_role not in User.ROLES:
+        return api_response(success=False, error="Invalid role", status=400)
+    
+    try:
+        user.role = new_role
+        user.is_admin = (new_role == User.ROLE_ADMIN)
+        db.session.commit()
+        return api_response(message=f"User {user.name} promoted to {new_role}", data={'user': user.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return api_response(success=False, error=str(e), status=500)
+
+
+@superadmin_bp.route('/developer/api/user/<int:user_id>/edit', methods=['POST'])
+@super_admin_required
+def edit_user_details(user_id):
+    """Edit user details."""
+    from ...api_utils import api_response, validate_json
+    user = User.query.get_or_404(user_id)
+    data, error = validate_json(['name', 'email'])
+    if error: return error
+    
+    try:
+        user.name = data.get('name')
+        user.email = data.get('email').lower()
+        user.prn = data.get('prn')
+        
+        db.session.commit()
+        return api_response(message="User details updated", data={'user': user.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return api_response(success=False, error=str(e), status=500)

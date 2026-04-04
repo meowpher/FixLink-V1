@@ -1,0 +1,16 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+.env
+instance/
+.git
+.gitignore
+.gemini
+tests/
+test_*.py
+Dockerfile
+docker-compose.yml

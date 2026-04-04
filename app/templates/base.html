@@ -35,11 +35,49 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
+                    {% if session.get('is_super_admin') %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('superadmin.dashboard') }}">
+                                <i class="bi bi-code-square me-1"></i>Developer
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('superadmin.list_users') }}">
+                                <i class="bi bi-people me-1"></i>Users
+                            </a>
+                        </li>
+                    {% endif %}
+
                     {% if session.get('user_id') or session.get('professional_id') %}
                         {% if session.get('is_admin') %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('admin.dashboard') }}">
                                 <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('admin.status_map') }}">
+                                <i class="bi bi-map me-1"></i>Status Map
+                            </a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-gear me-1"></i>Manage
+                            </a>
+                            <ul class="dropdown-menu shadow">
+                                <li><a class="dropdown-item" href="{{ url_for('admin.professionals') }}"><i class="bi bi-people me-2"></i>Professionals</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('admin.help_requests') }}"><i class="bi bi-hand-thumbs-up me-2"></i>Help Requests</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('admin.history') }}"><i class="bi bi-clock-history me-2"></i>Full History</a></li>
+                                {% if session.get('is_super_admin') or (SUPER_ADMIN_EMAIL and session.get('profile_email') == SUPER_ADMIN_EMAIL) or (session.get('user_name') == 'Admin' and session.get('is_admin')) %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-primary fw-bold" href="{{ url_for('superadmin.login') }}"><i class="bi bi-code-square me-2"></i>Developer Dashboard</a></li>
+                                {% endif %}
+                            </ul>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('admin.analytics_dashboard') }}">
+                                <i class="bi bi-graph-up me-1"></i>Insights
                             </a>
                         </li>
                         <li class="nav-item">
@@ -183,7 +221,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
     <!-- Custom JS -->
-    <script src="{{ url_for('static', filename='js/map.js') }}?v=2"></script>
     <script type="module" src="{{ url_for('static', filename='js/animations.js') }}"></script>
 
     {% block extra_js %}{% endblock %}
@@ -335,8 +372,9 @@
         // Fetch current user from server
         fetch('/api/me')
             .then(r => r.json())
-            .then(data => {
-                if (!data.success) return;
+            .then(result => {
+                if (!result.success) return;
+                const data = result.data;
                 const emailEl = document.getElementById('profileEmail');
                 const prnEl = document.getElementById('profilePRN');
                 if (emailEl) emailEl.textContent = data.email;
@@ -354,8 +392,8 @@
                 formData.append('photo', this.files[0]);
                 fetch('/profile/upload-photo', { method: 'POST', body: formData })
                     .then(r => r.json())
-                    .then(data => {
-                        if (data.success) setAvatar(document.getElementById('profileName').textContent, data.photo_url);
+                    .then(result => {
+                        if (result.success) setAvatar(document.getElementById('profileName').textContent, result.data.photo_url);
                     });
             });
         }
@@ -386,9 +424,9 @@
         async function fetchNotifications() {
             try {
                 const res = await fetch('/api/notifications');
-                const data = await res.json();
-                if (data.success) {
-                    updateUI(data.notifications, data.unread_count);
+                const result = await res.json();
+                if (result.success) {
+                    updateUI(result.data.notifications, result.data.unread_count);
                 }
             } catch (err) {
                 console.error('Failed to fetch notifications:', err);

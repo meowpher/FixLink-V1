@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: fixlink_web
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./instance:/app/instance
+      - ./app/static/uploads:/app/app/static/uploads
+      # .env mounted separately or explicitly mapped via environment blocks
+    env_file:
+      - .env
+    restart: unless-stopped
+    environment:
+      - FLASK_APP=run.py
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1

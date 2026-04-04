@@ -108,6 +108,18 @@ def notify_professional_assigned(ticket, professional):
             'time_limit_hours': ticket.time_limit_hours,
             'deadline': ticket.deadline_datetime.isoformat() + 'Z' if ticket.deadline_datetime else None
         }, room=room)
+        
+        # Trigger Web Push Notification
+        try:
+            from .utils import send_web_push
+            send_web_push(
+                professional_id=professional.id,
+                title="New Job Assignment",
+                body=f"You've been assigned to Room {ticket.room.number if ticket.room else 'Unknown'} for {ticket.issue_type}.",
+                url="/professional"
+            )
+        except Exception as e:
+            pass
 
 
 def notify_admin_job_started(ticket, professional):
@@ -136,6 +148,18 @@ def notify_admin_job_started(ticket, professional):
                 'professional_name': professional.name,
                 'started_at': ticket.job_started_at.isoformat() + 'Z' if ticket.job_started_at else None
             }, room=room)
+            
+            # Trigger Web Push for Admin
+            try:
+                from .utils import send_web_push
+                send_web_push(
+                    user_id=admin.id,
+                    title="Job Started",
+                    body=f"Technician {professional.name} started job for room {ticket.room.number if ticket.room else 'Unknown'}.",
+                    url=f"/admin/?ticket_id={ticket.id}"
+                )
+            except Exception as e:
+                pass
         db.session.commit()
 
 
@@ -165,17 +189,38 @@ def notify_admin_job_completed(ticket, professional):
                 'completed_at': ticket.job_completed_at.isoformat() + 'Z' if ticket.job_completed_at else None,
                 'has_photo': ticket.completion_photo_filename is not None
             }, room=room)
-
+            
+            # Trigger Web Push for Admin
+            try:
+                from .utils import send_web_push
+                send_web_push(
+                    user_id=admin.id,
+                    title="Job Completed",
+                    body=f"Technician {professional.name} completed job for room {ticket.room.number if ticket.room else 'Unknown'}.",
+                    url=f"/admin/?ticket_id={ticket.id}"
+                )
+            except Exception as e:
+                pass
 
         db.session.commit()
 
 def notify_admin_job_cancelled(ticket, professional, reason):
-    """Notify admin that a professional has cancelled a job (WebSocket part)."""
-    # Note: DB notification record is created in professional_routes.cancel_task
+    """Notify admin that a professional has cancelled a job."""
+    from .models import User, Notification
+    from . import db
     if socketio:
-        from .models import User
         admins = User.query.filter_by(is_admin=True).all()
         for admin in admins:
+            # Create persistent notification
+            notif = Notification(
+                user_id=admin.id,
+                title="Job Cancelled",
+                message=f"Technician {professional.name} cancelled job for room {ticket.room.number if ticket.room else 'Unknown'}. Reason: {reason}",
+                type=Notification.TYPE_SYSTEM,
+                link=f"/admin/?ticket_id={ticket.id}"
+            )
+            db.session.add(notif)
+            
             room = f'admin_{admin.id}'
             socketio.emit('job_cancelled', {
                 'ticket_id': ticket.id,
@@ -185,6 +230,19 @@ def notify_admin_job_cancelled(ticket, professional, reason):
                 'reason': reason,
                 'cancelled_at': ticket.cancelled_at.isoformat() + 'Z' if ticket.cancelled_at else None
             }, room=room)
+            
+            # Trigger Web Push for Admin
+            try:
+                from .utils import send_web_push
+                send_web_push(
+                    user_id=admin.id,
+                    title="Job Cancelled",
+                    body=f"Technician {professional.name} cancelled job for room {ticket.room.number if ticket.room else 'Unknown'}.",
+                    url=f"/admin/?ticket_id={ticket.id}"
+                )
+            except Exception as e:
+                pass
+        db.session.commit()
 
 
 def notify_admin_help_requested(help_request, requester, ticket):

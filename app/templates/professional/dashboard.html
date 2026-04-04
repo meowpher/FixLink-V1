@@ -191,7 +191,7 @@
                 <div class="row g-4">
                     {% for ticket in assigned_tickets %}
                     <div class="col-md-12">
-                        <div class="card ticket-card border-0 shadow-sm hover-shadow transition-normal" style="border-radius: var(--border-radius-lg); border-left: 5px solid {% if ticket.is_overdue %}#dc3545{% elif ticket.status == 'in-progress' %}#ffc107{% else %}#0b4d8c{% endif %} !important;">
+                        <div class="card ticket-card border-0 shadow-sm hover-shadow transition-normal {% if ticket.is_overdue %}border-status-overdue{% elif ticket.status == 'in-progress' %}border-status-in-progress{% else %}border-status-assigned{% endif %}" style="border-radius: var(--border-radius-lg);">
                             <div class="card-body p-4">
                                 <div class="d-flex justify-content-between align-items-start mb-3">
                                     <div>
@@ -396,7 +396,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
     let socket;
     let helpRequestModal;
@@ -441,6 +441,73 @@
             showToast(`You have been assigned as a helper for Ticket #${data.ticket_id} (Room ${data.ticket_number})!`, 'info');
             setTimeout(() => location.reload(), 2000);
         });
+    }
+
+    // --- Web Push Subscription Logic ---
+    const vapidPublicKey = '{{ vapid_public_key }}';
+    
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+            .replace(/\-/g, '+')
+            .replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+
+    if ('serviceWorker' in navigator && 'PushManager' in window && vapidPublicKey) {
+        navigator.serviceWorker.register('/static/js/sw.js')
+        .then(function(swReg) {
+            console.log('Service Worker is registered', swReg);
+            
+            // Ask permission immediately on load (or could be triggered by click)
+            Notification.requestPermission().then(function(permission) {
+                if (permission === 'granted') {
+                    console.log('Notification permission granted.');
+                    
+                    swReg.pushManager.getSubscription()
+                    .then(function(subscription) {
+                        if (subscription === null) {
+                            // Needs to subscribe
+                            const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+                            swReg.pushManager.subscribe({
+                                userVisibleOnly: true,
+                                applicationServerKey: convertedVapidKey
+                            })
+                            .then(function(newSubscription) {
+                                console.log('User is subscribed.');
+                                // Send to server
+                                sendSubscriptionToServer(newSubscription);
+                            })
+                            .catch(function(err) {
+                                console.log('Failed to subscribe the user: ', err);
+                            });
+                        } else {
+                            // Already subscribed, just make sure server has latest
+                            sendSubscriptionToServer(subscription);
+                        }
+                    });
+                }
+            });
+        })
+        .catch(function(error) {
+            console.error('Service Worker Error', error);
+        });
+    }
+
+    function sendSubscriptionToServer(subscription) {
+        fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(subscription)
+        })
+        .then(response => response.json())
+        .then(res => console.log('Push subscription verified by server.'))
+        .catch(err => console.error('Failed to post subscription:', err));
     }
     
     function setComplexity(ticketId, complexity) {

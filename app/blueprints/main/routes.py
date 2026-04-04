@@ -6,9 +6,10 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, current_app, session, redirect, url_for
 from werkzeug.utils import secure_filename
 from ... import db
-from ...models import Building, Floor, Room, Asset, Ticket, User, Notification
+from ...models import Building, Floor, Room, Asset, Ticket, User, Notification, Professional
 from ...utils import send_ticket_email, ALLOWED_EXTENSIONS, allowed_file
-from ..auth.routes import user_login_required
+from ...decorators import user_login_required, login_required
+from ...api_utils import handle_api_errors, api_response
 
 main_bp = Blueprint('main', __name__)
 
@@ -176,6 +177,12 @@ def submit_report():
         
         db.session.commit()
         
+        # Invalidate map cache for this floor
+        room_obj = Room.query.get(r_id)
+        if room_obj:
+            from ...cache import invalidate_floor_cache
+            invalidate_floor_cache(room_obj.floor_id)
+        
         # Trigger EmailJS notification for ticket creation
         # (Consider moving this to a background task in production)
         try:
@@ -212,40 +219,46 @@ def submit_report():
 
 @main_bp.route('/api/floors/<int:building_id>', methods=['GET'])
 @user_login_required
+@handle_api_errors
 def get_floors(building_id):
     """Get all floors for a building (JSON)."""
     floors = Floor.query.filter_by(building_id=building_id).order_by(Floor.level).all()
-    return jsonify({
-        'success': True,
-        'floors': [floor.to_dict() for floor in floors]
-    })
+    return api_response(data={'floors': [floor.to_dict() for floor in floors]})
 
 
 @main_bp.route('/api/rooms/floor/<int:floor_id>', methods=['GET'])
 @user_login_required
+@handle_api_errors
 def get_rooms_by_floor(floor_id):
-    """Get all rooms for a floor (JSON)."""
-    rooms = Room.query.filter_by(floor_id=floor_id).all()
-    return jsonify({
-        'success': True,
-        'rooms': [{
-            **room.to_dict(),
-            'status': room.status,
-            'has_open_tickets': room.has_open_tickets
-        } for room in rooms]
-    })
+    """Get all rooms for a floor (JSON) - Optimized with eager loading and caching."""
+    from ...cache import cache
+    
+    cache_key = f'map_floor_{floor_id}'
+    cached = cache.get(cache_key)
+    if cached:
+        return api_response(data=cached)
+    
+    from sqlalchemy.orm import joinedload
+    rooms = Room.query.options(
+        joinedload(Room.tickets),
+        joinedload(Room.assets)
+    ).filter_by(floor_id=floor_id).all()
+    
+    result = {
+        'rooms': [room.to_map_dict() for room in rooms]
+    }
+    
+    cache.set(cache_key, result, timeout=3600)  # 60 minutes
+    return api_response(data=result)
 
 
 @main_bp.route('/api/room/<room_number>', methods=['GET'])
 @user_login_required
+@handle_api_errors
 def get_room_by_number(room_number):
     """Get room details by room number (JSON)."""
-    room = Room.query.filter_by(number=room_number.upper()).first()
-    if not room:
-        return jsonify({'success': False, 'error': 'Room not found'}), 404
-    
-    return jsonify({
-        'success': True,
+    room = Room.query.filter_by(number=room_number.upper()).first_or_404()
+    return api_response(data={
         'room': {
             **room.to_dict(),
             'status': room.status,
@@ -256,27 +269,25 @@ def get_room_by_number(room_number):
 
 @main_bp.route('/api/assets/<int:room_id>', methods=['GET'])
 @user_login_required
+@handle_api_errors
 def get_assets(room_id):
     """Get all assets for a room (JSON)."""
     assets = Asset.query.filter_by(room_id=room_id).all()
-    return jsonify({
-        'success': True,
-        'assets': [asset.to_dict() for asset in assets]
-    })
+    return api_response(data={'assets': [asset.to_dict() for asset in assets]})
 
 
 @main_bp.route('/api/buildings', methods=['GET'])
 @user_login_required
+@handle_api_errors
 def get_buildings():
     """Get all buildings (JSON)."""
     buildings = Building.query.all()
-    return jsonify({
-        'success': True,
-        'buildings': [building.to_dict() for building in buildings]
-    })
+    return api_response(data={'buildings': [building.to_dict() for building in buildings]})
 
 
 @main_bp.route('/api/me')
+@login_required
+@handle_api_errors
 def get_me():
     """Return current profile info (user or professional) for the navbar avatar."""
     if 'user_id' in session:
@@ -286,8 +297,7 @@ def get_me():
                 url_for('static', filename=f'uploads/{user.profile_photo}')
                 if user.profile_photo else None
             )
-            return jsonify({
-                'success': True,
+            return api_response(data={
                 'name': user.name,
                 'email': user.email,
                 'prn': user.prn or ('Admin' if user.is_admin else ''),
@@ -298,14 +308,11 @@ def get_me():
     if 'professional_id' in session:
         professional = Professional.query.get(session['professional_id'])
         if professional:
-            # Check if professionals have profile photos (they don't seem to have a field in the model yet, 
-            # but I'll add logic for completeness or if it's added later)
             photo_url = None
             if hasattr(professional, 'profile_photo') and professional.profile_photo:
                 photo_url = url_for('static', filename=f'uploads/{professional.profile_photo}')
             
-            return jsonify({
-                'success': True,
+            return api_response(data={
                 'name': professional.name,
                 'email': professional.email or '',
                 'prn': professional.category.title(), # Use category as ID for professionals
@@ -313,62 +320,83 @@ def get_me():
                 'type': 'professional'
             })
             
-    return jsonify({'success': False, 'error': 'Not logged in'}), 401
+    return api_response(success=False, error="Not logged in", status=401)
 
 
 @main_bp.route('/api/notifications', methods=['GET'])
+@login_required
+@handle_api_errors
 def get_notifications():
     """Get notifications for the current user."""
     user_id = session.get('user_id')
-    if not user_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    
     notifications = Notification.query.filter_by(user_id=user_id).order_by(Notification.created_at.desc()).limit(20).all()
     
-    return jsonify({
-        'success': True,
+    return api_response(data={
         'notifications': [n.to_dict() for n in notifications],
         'unread_count': Notification.query.filter_by(user_id=user_id, is_read=False).count()
     })
 
 
 @main_bp.route('/api/notifications/read-all', methods=['POST'])
+@login_required
+@handle_api_errors
 def read_all_notifications():
     """Mark all notifications as read for current user."""
     user_id = session.get('user_id')
-    if not user_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    
     Notification.query.filter_by(user_id=user_id, is_read=False).update({Notification.is_read: True})
     db.session.commit()
-    
-    return jsonify({'success': True})
+    return api_response(message="All notifications marked as read")
 
 
 @main_bp.route('/api/notifications/<int:notification_id>/read', methods=['POST'])
+@login_required
+@handle_api_errors
 def read_notification(notification_id):
     """Mark a specific notification as read."""
     user_id = session.get('user_id')
-    if not user_id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    
     notification = Notification.query.filter_by(id=notification_id, user_id=user_id).first_or_404()
     notification.is_read = True
     db.session.commit()
+    return api_response(message="Notification marked as read")
+
+
+@main_bp.route('/api/push/subscribe', methods=['POST'])
+@login_required
+@handle_api_errors
+def push_subscribe():
+    """Store Web Push subscription keys."""
+    from ...api_utils import validate_json
+    data, error = validate_json(['endpoint', 'keys'])
+    if error: return error
     
-    return jsonify({'success': True})
-@main_bp.route('/debug-info')
-def debug_info():
-    """Diagnostic info."""
-    import os
-    from .models import Ticket
-    from flask import current_app
-    total = Ticket.query.count()
-    all_statuses = [t.status for t in Ticket.query.all()]
-    return jsonify({
-        'total': total,
-        'all_statuses': all_statuses,
-        'STATUS_OPEN': Ticket.STATUS_OPEN,
-        'db_uri': current_app.config.get('SQLALCHEMY_DATABASE_URI'),
-        'cwd': os.getcwd()
-    })
+    endpoint = data['endpoint']
+    keys = data['keys']
+    p256dh = keys.get('p256dh')
+    auth = keys.get('auth')
+    
+    if not endpoint or not p256dh or not auth:
+        return api_response(success=False, error="Missing required keys", status=400)
+        
+    user_id = session.get('user_id')
+    prof_id = session.get('professional_id')
+    
+    from ...models import PushSubscription
+    # Update or create
+    sub = PushSubscription.query.filter_by(endpoint=endpoint).first()
+    if not sub:
+        sub = PushSubscription(
+            endpoint=endpoint,
+            p256dh=p256dh,
+            auth=auth,
+            user_id=user_id,
+            professional_id=prof_id
+        )
+        db.session.add(sub)
+    else:
+        sub.p256dh = p256dh
+        sub.auth = auth
+        sub.user_id = user_id
+        sub.professional_id = prof_id
+        
+    db.session.commit()
+    return api_response(message="Subscription stored successfully")

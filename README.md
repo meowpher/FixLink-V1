@@ -13,7 +13,7 @@ A Flask-based web application for the Vyas Building at MIT-WPU featuring an inte
 ## Tech Stack
 
 - **Backend**: Flask 3.0+, Flask-SQLAlchemy, Werkzeug
-- **Database**: SQLite (development)
+- **Database**: Supabase (PostgreSQL)
 - **Frontend**: Bootstrap 5, Interactive CSS Grid Map, Custom CSS
 - **Tools**: Pillow, qrcode
 
@@ -254,7 +254,7 @@ mitwpu_vyas_tracker/
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SECRET_KEY` | `vyas-secret-key-mitwpu-2024` | Flask secret key |
-| `DATABASE_URL` | `sqlite:///vyas_tracker.db` | Database URL |
+| `DATABASE_URL` | `postgresql://...supabase.co:5432/postgres` | Database URL |
 | `PORT` | `5000` | Server port |
 | `FLASK_DEBUG` | `True` | Debug mode |
 

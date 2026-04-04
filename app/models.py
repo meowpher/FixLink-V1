@@ -10,11 +10,18 @@ class User(db.Model):
     """User model - unified auth for admins and reporters."""
     __tablename__ = 'users'
     
+    ROLE_STUDENT = 'student'
+    ROLE_FACULTY = 'faculty'
+    ROLE_ADMIN = 'admin'
+    
+    ROLES = [ROLE_STUDENT, ROLE_FACULTY, ROLE_ADMIN]
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     prn = db.Column(db.String(20), nullable=True)
     email = db.Column(db.String(120), nullable=False, unique=True)
     password_hash = db.Column(db.String(255), nullable=True)
+    role = db.Column(db.String(20), default=ROLE_STUDENT, nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     is_verified = db.Column(db.Boolean, default=False)
     verification_token = db.Column(db.String(100), nullable=True)
@@ -32,8 +39,21 @@ class User(db.Model):
             return False
         return check_password_hash(self.password_hash, password)
         
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'email': self.email,
+            'prn': self.prn,
+            'role': self.role,
+            'is_admin': self.is_admin,
+            'is_verified': self.is_verified,
+            'photo_url': self.profile_photo,
+            'created_at': self.created_at.isoformat() + 'Z' if self.created_at else None
+        }
+
     def __repr__(self):
-        return f'<User {self.email}>'
+        return f'<User {self.email} ({self.role})>'
 
 class Building(db.Model):
     """Building model - Vyas building."""
@@ -127,18 +147,18 @@ class Room(db.Model):
     
     @property
     def has_open_tickets(self):
-        """Check if room has any OPEN tickets (Red status)."""
-        return any(t.status == Ticket.STATUS_OPEN for t in self.tickets)
+        """Check if room has any OPEN tickets (Red status) using efficient DB query."""
+        return Ticket.query.filter_by(room_id=self.id, status=Ticket.STATUS_OPEN).first() is not None
     
     @property
     def has_in_progress_tickets(self):
-        """Check if room has any IN_PROGRESS tickets (Yellow status)."""
-        return any(t.status == Ticket.STATUS_IN_PROGRESS for t in self.tickets)
+        """Check if room has any IN_PROGRESS tickets (Yellow status) using efficient DB query."""
+        return Ticket.query.filter_by(room_id=self.id, status=Ticket.STATUS_IN_PROGRESS).first() is not None
     
     @property
     def has_broken_assets(self):
-        """Check if room has any broken assets."""
-        return any(a.status == Asset.STATUS_BROKEN for a in self.assets)
+        """Check if room has any broken assets using efficient DB query."""
+        return Asset.query.filter_by(room_id=self.id, status=Asset.STATUS_BROKEN).first() is not None
         
     @property
     def status(self):
@@ -153,6 +173,37 @@ class Room(db.Model):
         elif self.has_in_progress_tickets:
             return 'in-progress'
         return 'normal'
+
+    def compute_status_from_loaded(self):
+        """
+        Compute room status from eagerly-loaded relationships.
+        Avoids N+1 queries by reading from already-loaded collections.
+        """
+        has_open = any(t.status == Ticket.STATUS_OPEN for t in self.tickets)
+        has_broken = any(a.status == Asset.STATUS_BROKEN for a in self.assets)
+        has_in_progress = any(t.status == Ticket.STATUS_IN_PROGRESS for t in self.tickets)
+        
+        if has_open or has_broken:
+            return 'issue', has_open, has_broken
+        elif has_in_progress:
+            return 'in-progress', has_open, has_broken
+        return 'normal', has_open, has_broken
+
+    def to_map_dict(self):
+        """
+        Slim serialization for map rendering.
+        MUST be called after eager-loading tickets and assets.
+        """
+        status, has_open, has_broken = self.compute_status_from_loaded()
+        return {
+            'id': self.id,
+            'number': self.number,
+            'name': self.name,
+            'room_type': self.room_type,
+            'status': status,
+            'has_open_tickets': has_open,
+            'has_broken_assets': has_broken,
+        }
 
 
 class Asset(db.Model):
@@ -170,7 +221,12 @@ class Asset(db.Model):
     name = db.Column(db.String(100), nullable=False)
     asset_type = db.Column(db.String(50), nullable=False)  # e.g., 'projector', 'ac', 'computer'
     status = db.Column(db.String(20), default=STATUS_WORKING, nullable=False)
+    installation_date = db.Column(db.DateTime, default=datetime.utcnow) # Actual date asset was installed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.Index('idx_asset_room_status', 'room_id', 'status'),
+    )
     
     # Relationships
     tickets = db.relationship('Ticket', backref='asset', lazy=True)
@@ -185,7 +241,17 @@ class Asset(db.Model):
             'asset_type': self.asset_type,
             'room_id': self.room_id,
             'status': self.status,
+            'installation_date': self.installation_date.isoformat() + 'Z' if self.installation_date else None,
             'created_at': self.created_at.isoformat() + 'Z' if self.created_at else None
+        }
+
+    def to_map_dict(self):
+        """Slim serialization for map rendering."""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'asset_type': self.asset_type,
+            'status': self.status,
         }
 
 
@@ -246,6 +312,13 @@ class Ticket(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     fixed_at = db.Column(db.DateTime, nullable=True)
+    last_notification_sent_at = db.Column(db.DateTime, nullable=True)
+    
+    __table_args__ = (
+        db.Index('idx_ticket_status_created', 'status', 'created_at'),
+        db.Index('idx_ticket_reporter_created', 'reporter_id', 'created_at'),
+        db.Index('idx_ticket_professional_status', 'assigned_professional_id', 'status'),
+    )
     
     def __repr__(self):
         return f'<Ticket #{self.id} - {self.status}>'
@@ -314,8 +387,9 @@ class Professional(db.Model):
     CATEGORY_ELECTRICIAN = 'electrician'
     CATEGORY_PLUMBER = 'plumber'
     CATEGORY_CARPENTER = 'carpenter'
+    CATEGORY_OTHER = 'other'
     
-    CATEGORIES = [CATEGORY_IT, CATEGORY_ELECTRICIAN, CATEGORY_PLUMBER, CATEGORY_CARPENTER]
+    CATEGORIES = [CATEGORY_IT, CATEGORY_ELECTRICIAN, CATEGORY_PLUMBER, CATEGORY_CARPENTER, CATEGORY_OTHER]
     
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), nullable=True, unique=True)
@@ -472,4 +546,27 @@ class Notification(db.Model):
             'link': self.link,
             'is_read': self.is_read,
             'created_at': self.created_at.isoformat() + 'Z' if self.created_at else None
+        }
+
+class PushSubscription(db.Model):
+    """Stores Web Push API subscriptions for native notifications."""
+    __tablename__ = 'push_subscriptions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    professional_id = db.Column(db.Integer, db.ForeignKey('professionals.id'), nullable=True)
+    
+    endpoint = db.Column(db.String(500), nullable=False, unique=True)
+    p256dh = db.Column(db.String(255), nullable=False)
+    auth = db.Column(db.String(255), nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            "endpoint": self.endpoint,
+            "keys": {
+                "p256dh": self.p256dh,
+                "auth": self.auth
+            }
         }

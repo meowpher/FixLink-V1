@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users - Developer Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="{{ url_for('superadmin.dashboard') }}">Developer</a></li>
+                    <li class="breadcrumb-item active">Users</li>
+                </ol>
+            </nav>
+            <h2 class="mb-0"><i class="bi bi-people-fill me-2"></i>All Users</h2>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">User</th>
+                            <th>ID/PRN</th>
+                            <th>Current Role</th>
+                            <th>Joined</th>
+                            <th class="text-end pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr id="user-row-{{ user.id }}">
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <div class="nav-avatar nav-avatar-sm me-3" style="width: 38px; height: 38px; font-size: 0.8rem;">
+                                        {% if user.profile_photo %}
+                                            <img src="{{ url_for('static', filename='uploads/profiles/' + user.profile_photo) }}" alt="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                                        {% else %}
+                                            <span>{{ user.name[:1] }}{{ user.name.split()[-1][0] if ' ' in user.name else '' }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold text-dark">{{ user.name }}</div>
+                                        <div class="text-muted small">{{ user.email }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="badge bg-light text-dark border">{{ user.prn or 'N/A' }}</span></td>
+                            <td>
+                                <select class="form-select form-select-sm border-0 bg-light role-select" 
+                                        style="width: 130px; font-weight: 500;" 
+                                        data-id="{{ user.id }}">
+                                    {% for role in roles %}
+                                    <option value="{{ role }}" {% if user.role == role %}selected{% endif %}>
+                                        {{ role.capitalize() }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td><small class="text-muted">{{ user.created_at.strftime('%d %b %Y') }}</small></td>
+                            <td class="text-end pe-4">
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-primary btn-edit-user" 
+                                            data-id="{{ user.id }}"
+                                            data-name="{{ user.name|escape }}"
+                                            data-email="{{ user.email|escape }}"
+                                            data-prn="{{ user.prn|escape }}">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger btn-delete-user"
+                                            data-id="{{ user.id }}"
+                                            data-name="{{ user.name|escape }}">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title"><i class="bi bi-person-gear me-2"></i>Edit User Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="editUserForm">
+                    <input type="hidden" id="editUserId">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Full Name</label>
+                        <input type="text" class="form-control" id="editUserName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Email Address</label>
+                        <input type="email" class="form-control" id="editUserEmail" required>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-bold">PRN/ID</label>
+                        <input type="text" class="form-control" id="editUserPRN">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary px-4" onclick="saveUserDetails()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const csrfToken = "{{ csrf_token() }}";
+    const editModal = new bootstrap.Modal(document.getElementById('editUserModal'));
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Wire up edit buttons
+        document.querySelectorAll('.btn-edit-user').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.id;
+                const name = btn.dataset.name;
+                const email = btn.dataset.email;
+                const prn = btn.dataset.prn;
+                
+                document.getElementById('editUserId').value = id;
+                document.getElementById('editUserName').value = name;
+                document.getElementById('editUserEmail').value = email;
+                document.getElementById('editUserPRN').value = prn === 'None' ? '' : prn;
+                editModal.show();
+            });
+        });
+
+        // Wire up delete buttons
+        document.querySelectorAll('.btn-delete-user').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.id;
+                const name = btn.dataset.name;
+                deleteUser(id, name);
+            });
+        });
+
+        // Wire up role selects
+        document.querySelectorAll('.role-select').forEach(select => {
+            select.addEventListener('change', () => {
+                const id = select.dataset.id;
+                const newRole = select.value;
+                updateUserRole(id, newRole);
+            });
+        });
+    });
+
+    async function updateUserRole(userId, newRole) {
+        if (!confirm(`Are you sure you want to change this user's role to ${newRole}? This will update their administrative permissions.`)) {
+            location.reload(); // Reset select
+            return;
+        }
+
+        try {
+            const res = await fetch(`/developer/api/user/${userId}/update-role`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ role: newRole })
+            });
+            const result = await res.json();
+            if (result.success) {
+                // Flash success UI or reload
+                window.location.reload();
+            } else {
+                alert(result.error || 'Failed to update role');
+                location.reload();
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Network error');
+        }
+    }
+
+    async function saveUserDetails() {
+        const id = document.getElementById('editUserId').value;
+        const name = document.getElementById('editUserName').value;
+        const email = document.getElementById('editUserEmail').value;
+        const prn = document.getElementById('editUserPRN').value;
+
+        try {
+            const res = await fetch(`/developer/api/user/${id}/edit`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ name, email, prn })
+            });
+            const result = await res.json();
+            if (result.success) {
+                window.location.reload();
+            } else {
+                alert(result.error || 'Failed to update user');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Network error');
+        }
+    }
+
+    async function deleteUser(userId, name) {
+        if (!confirm(`CRITICAL ACTION: Are you sure you want to PERMANENTLY delete user "${name}"? This action cannot be undone.`)) return;
+
+        try {
+            const res = await fetch(`/developer/api/user/${userId}/delete`, { 
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            });
+            const result = await res.json();
+            if (result.success) {
+                document.getElementById(`user-row-${userId}`).remove();
+            } else {
+                alert(result.error || 'Failed to delete user');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Network error');
+        }
+    }
+</script>
+{% endblock %}

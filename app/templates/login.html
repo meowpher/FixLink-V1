@@ -24,6 +24,7 @@
                     {% endwith %}
                     
                     <form method="POST" action="{{ url_for('auth.login') }}{% if show_phone_hint %}?pro=1{% endif %}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label class="form-label" id="loginLabel">
                                 {% if show_phone_hint %}

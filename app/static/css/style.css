@@ -1467,6 +1467,29 @@ body {
     margin-bottom: 0;
 }
 
+.admin-action-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.btn-accent {
+    background: #00d2ff;
+    background: -webkit-linear-gradient(to right, #3a7bd5, #00d2ff);
+    background: linear-gradient(to right, #3a7bd5, #00d2ff);
+    border: none;
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(0, 210, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+.btn-accent:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 210, 255, 0.4);
+    color: white;
+}
+
 /* Statistics Cards */
 .stats-section {
     padding: 2rem 0;
@@ -1552,6 +1575,11 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* Ticket Status Border Classes for Dashboard */
+.border-status-overdue { border-left: 5px solid #dc3545 !important; }
+.border-status-in-progress { border-left: 5px solid #ffc107 !important; }
+.border-status-assigned { border-left: 5px solid #0b4d8c !important; }
 
 /* Filters & Tickets Table */
 .filters-section {

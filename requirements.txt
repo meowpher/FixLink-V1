@@ -9,3 +9,11 @@ qrcode
 python-dotenv
 itsdangerous
 requests
+Flask-Migrate
+psycopg2-binary
+Flask-Caching
+pywebpush
+Flask-WTF
+Flask-Limiter
+fpdf2
+pandas

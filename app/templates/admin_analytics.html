@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics & Insights - Admin Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .analytics-card {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        transition: transform 0.3s ease;
+        background: #fff;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .analytics-card:hover {
+        transform: translateY(-5px);
+    }
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--mitwpu-blue);
+    }
+    .stat-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+        flex-grow: 1;
+    }
+    [data-theme="dark"] .analytics-card {
+        background: #1e293b;
+        color: #f8fafc;
+    }
+    [data-theme="dark"] .stat-label {
+        color: #94a3b8;
+    }
+    [data-theme="dark"] .stat-value {
+        color: #60a5fa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Admin Header -->
+<section class="admin-header vyas-admin-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h1 class="admin-title">
+                    <i class="bi bi-graph-up-arrow me-2"></i>Insights
+                </h1>
+                <p class="admin-subtitle">Performance Metrics & Maintenance Trends</p>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <div class="admin-actions">
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-light me-2">
+                        <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                    </a>
+                    <button class="btn btn-outline-light" onclick="window.print()">
+                        <i class="bi bi-printer me-1"></i>Export PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div class="container py-5">
+    <!-- Summary Stats -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-3">
+            <div class="analytics-card p-4 text-center">
+                <div class="stat-label mb-2">Total Volume</div>
+                <div class="stat-value">{{ total_tickets }}</div>
+                <div class="mt-2 small text-muted">All-time tickets reported</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="analytics-card p-4 text-center">
+                <div class="stat-label mb-2">Resolved</div>
+                <div class="stat-value text-success">{{ fixed_count }}</div>
+                <div class="mt-2 small text-muted">Successfully fixed issues</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="analytics-card p-4 text-center">
+                <div class="stat-label mb-2">Success Rate</div>
+                <div class="stat-value text-primary">{{ success_rate }}%</div>
+                <div class="mt-2 small text-muted">Ticket resolution efficiency</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="analytics-card p-4 text-center">
+                <div class="stat-label mb-2">Avg. Fix Time</div>
+                <div class="stat-value text-warning">{{ avg_res_time }}h</div>
+                <div class="mt-2 small text-muted">Mean time to resolution</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visualizations -->
+    <div class="row g-4">
+        <!-- Trend Chart -->
+        <div class="col-lg-8">
+            <div class="analytics-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0 fw-bold">Registration Trend</h5>
+                    <span class="badge bg-primary-subtle text-primary py-2 px-3">Last 6 Months</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Category Distribution -->
+        <div class="col-lg-4">
+            <div class="analytics-card p-4">
+                <h5 class="mb-4 fw-bold">Issue Breakdown</h5>
+                <div class="chart-container">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+                <div class="mt-3 small text-muted text-center">
+                    Distribution across different issue types
+                </div>
+            </div>
+        </div>
+
+        <!-- Additional Insights -->
+        <div class="col-12 mt-4">
+            <div class="analytics-card p-4">
+                <h5 class="mb-4 fw-bold">Service Category Distribution</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Category</th>
+                                <th>Ticket Count</th>
+                                <th>Percentage</th>
+                                <th>Trend State</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cat, count in category_data.items() %}
+                            <tr>
+                                <td class="fw-semibold">{{ cat|title }}</td>
+                                <td>{{ count }}</td>
+                                <td>
+                                    <div class="progress" style="height: 8px; width: 100px;">
+                                        <div class="progress-bar" role="progressbar" 
+                                             style="width: {{ (count / total_tickets * 100)|round|int if total_tickets > 0 else 0 }}%"></div>
+                                    </div>
+                                    <small class="text-muted">{{ (count / total_tickets * 100)|round(1) if total_tickets > 0 else 0 }}%</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success-subtle text-success">Stable</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Theme-aware colors
+        const isDark = document.body.getAttribute('data-theme') === 'dark';
+        const primaryColor = '#003399';
+        const secondaryColor = '#60a5fa';
+        const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+        const textColor = isDark ? '#f8fafc' : '#1e293b';
+
+        // 1. Trend Chart
+        const trendData = {{ monthly_trend|tojson }};
+        const trendCtx = document.getElementById('trendChart').getContext('2d');
+        
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: trendData.map(d => d.month),
+                datasets: [{
+                    label: 'Monthly Tickets',
+                    data: trendData.map(d => d[1]),
+                    borderColor: primaryColor,
+                    backgroundColor: 'rgba(0, 51, 153, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointBackgroundColor: primaryColor
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        grid: { color: gridColor },
+                        ticks: { color: textColor }
+                    },
+                    x: { 
+                        grid: { display: false },
+                        ticks: { color: textColor }
+                    }
+                }
+            }
+        });
+
+        // 2. Category Pie Chart
+        const catLabels = {{ category_data.keys()|list|tojson }};
+        const catValues = {{ category_data.values()|list|tojson }};
+        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+
+        new Chart(categoryCtx, {
+            type: 'doughnut',
+            data: {
+                labels: catLabels.map(l => l.charAt(0).toUpperCase() + l.slice(1)),
+                datasets: [{
+                    data: catValues,
+                    backgroundColor: [
+                        '#003399', '#ffcc00', '#28a745', '#dc3545', '#17a2b8', '#6610f2', '#fd7e14'
+                    ],
+                    borderWidth: isDark ? 2 : 0,
+                    borderColor: '#1e293b'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: textColor,
+                            boxWidth: 12,
+                            padding: 15,
+                            font: { size: 11 }
+                        }
+                    }
+                },
+                cutout: '70%'
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -124,132 +124,95 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Load Map Logic -->
-<script src="{{ url_for('static', filename='js/map.js') }}"></script>
-<script>
-    // Global floor data
+<script type="module">
+    import { initializeAdminMap } from "{{ url_for('static', filename='js/modules/admin_map.js') }}";
+    
+    // Global floor data from server - using a safe way to handle null/undefined
     const currentFloorId = {{ selected_floor.id if selected_floor else 'null' }};
+    
     document.addEventListener('DOMContentLoaded', function () {
         if (currentFloorId) {
-            loadFloorMap(currentFloorId);
+            initializeAdminMap(currentFloorId);
         }
     });
 
-    function loadFloorMap(floorId) {
-        const container = document.getElementById('adminMapContainer');
-        const urlParams = new URLSearchParams(window.location.search);
-        const targetRoomNumber = urlParams.get('room');
-
-        container.innerHTML = `
-            <div class="spinner-border text-primary m-auto" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>`;
-
-        fetch(`/admin/floor-data/${floorId}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    const floorLevel = data.floor.level;
-                    const rooms = data.rooms;
-
-                    container.innerHTML = '';
-
-                    // Level 0 & 1 use Ground Layout, others use Detailed
-                    if (floorLevel <= 1) {
-                        try {
-                            renderGroundFloor(container, rooms, true);
-                        } catch (e) {
-                            console.error("Error rendering ground floor:", e);
-                            container.innerHTML = '<div class="alert alert-danger">Error rendering map</div>';
-                        }
-                    } else {
-                        try {
-                            renderDetailedLayout(container, rooms, floorLevel, true);
-                        } catch (e) {
-                            console.error("Error rendering detailed floor:", e);
-                            container.innerHTML = '<div class="alert alert-danger">Error rendering map</div>';
-                        }
-                    }
-                } else {
-                    container.innerHTML = '<div class="alert alert-danger">Failed to load floor data</div>';
-                }
-
-                // If a room parameter is present, auto-select and scroll to it
-                if (targetRoomNumber) {
-                    setTimeout(() => {
-                        window.selectRoom(targetRoomNumber, null, null);
-                        const targetElement = document.querySelector(`g[data-room="${targetRoomNumber}"]`);
-                        if(targetElement) {
-                            targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                    }, 100); // Slight delay to ensure SVG render completion
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                container.innerHTML = '<div class="alert alert-danger">Network error loading map</div>';
-            });
-    }
-
-    // OVERRIDE selectRoom to show admin details instead of form selection
-    window.selectRoom = function (roomNumber, roomId, roomName) {
-        // Highlight logic (CSS class)
-        document.querySelectorAll('.room-group, .room-poly').forEach(el => el.classList.remove('selected'));
-        const roomGroup = document.querySelector(`g[data-room="${roomNumber}"]`);
-        if (roomGroup) {
-            roomGroup.classList.add('selected');
-            const poly = roomGroup.querySelector('.room-poly');
-            if (poly) poly.classList.add('selected');
-        }
-
-        // Show details panel
-        showRoomDetails(roomNumber, roomId);
-    };
-
-    function showRoomDetails(roomNumber, roomId) {
-        const panel = document.getElementById('roomDetailsPanel');
-        const panelTitle = document.getElementById('panelRoomNumber');
-        const panelBody = document.getElementById('panelBody');
-
-        panelTitle.textContent = roomNumber;
-        panelBody.innerHTML = '<div class="p-3 text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</div>';
-        panel.style.display = 'block';
-
-        // Fetch room details
-        if (roomId) {
-            fetch(`/api/room/${roomNumber}`)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        const room = data.room;
-                        // Construct Issues Badge
-                        const statusBadge = room.status === 'issue'
-                            ? '<span class="badge bg-danger">Issue Reported</span>'
-                            : (room.status === 'in-progress' ? '<span class="badge bg-warning text-dark">Issue In Progress</span>' : '<span class="badge bg-success">Normal</span>');
-
-                        panelBody.innerHTML = `
-                            <div class="mb-3">
-                                <h6>${room.name || room.number}</h6>
-                                <p class="mb-1 text-muted small">${room.room_type.toUpperCase()}</p>
-                                ${statusBadge}
-                            </div>
-                            
-                            <hr>
-                            
-                            <div class="d-grid gap-2">
-                                <a href="{{ url_for('admin.dashboard') }}?floor=${room.floor_id}&room=${room.id}" class="btn btn-primary btn-sm">
-                                    <i class="bi bi-ticket-detailed me-1"></i> View Tickets
-                                </a>
-                            </div>
-                        `;
-                    }
-                });
+    // Handle room deep-linking and focus
+    function focusRoom(roomNumber) {
+        const targetElement = document.querySelector(`g[data-room="${roomNumber}"]`);
+        if(targetElement) {
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetElement.classList.add('pulse-focus');
+            setTimeout(() => targetElement.classList.remove('pulse-focus'), 2000);
         }
     }
-
-    function closeRoomDetails() {
-        document.getElementById('roomDetailsPanel').style.display = 'none';
-        document.querySelectorAll('.room-group, .room-poly').forEach(el => el.classList.remove('selected'));
-    }
+    
+    window.focusRoom = focusRoom;
 </script>
+
+<style>
+    .room-details-panel {
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        width: 320px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        z-index: 1000;
+        overflow: hidden;
+        border: 1px solid rgba(0,0,0,0.05);
+        animation: slideInRight 0.3s ease-out;
+    }
+    
+    @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    .action-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.1rem;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    .action-btn:hover { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    
+    .btn-assign { background-color: #34495e; }
+    .btn-complete { background-color: #27ae60; }
+    .btn-delete { background-color: #e74c3c; }
+    .btn-map { background-color: #2980b9; }
+
+    .pulse-focus {
+        animation: pulseFocus 1s ease-in-out infinite;
+    }
+    @keyframes pulseFocus {
+        0% { filter: drop-shadow(0 0 0px #0d6efd); }
+        50% { filter: drop-shadow(0 0 15px #0d6efd); }
+        100% { filter: drop-shadow(0 0 0px #0d6efd); }
+    }
+    
+    .panel-header {
+        padding: 15px 20px;
+        background: #f8f9fa;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .x-small { font-size: 0.7rem; }
+    .uppercase { text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    .room-group.selected .room-poly {
+        stroke: #0d6efd !important;
+        stroke-width: 3px !important;
+    }
+</style>
 {% endblock %}

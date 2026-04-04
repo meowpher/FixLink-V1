@@ -344,7 +344,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
     let socket;
     const chatConfig = document.getElementById('chatConfig');
@@ -393,12 +393,12 @@
     async function loadProfessionals() {
         try {
             const response = await fetch('/admin/api/chat/professionals');
-            const data = await response.json();
-            if (data.success) {
-                professionals = data.professionals;
+            const result = await response.json();
+            if (result.success) {
+                professionals = result.data.professionals;
                 renderProfessionals();
                 
-                // If a professional was pre-selected, just update the sidebar highlighing
+                // If a professional was pre-selected, just update the sidebar highlighting
                 // but DON'T call selectProfessional as it reloads history and clears view
                 if (selectedProfessionalId) {
                     const items = document.querySelectorAll('.prof-item');
@@ -478,8 +478,9 @@
         
         try {
             const response = await fetch(`/admin/api/chat/history/${profId}`);
-            const data = await response.json();
-            if (data.success) {
+            const result = await response.json();
+            if (result.success) {
+                const data = result.data;
                 container.innerHTML = '';
                 if (data.messages.length === 0) {
                     container.innerHTML = '<div class="text-center text-muted py-5">No messages yet. Say hello!</div>';
@@ -514,9 +515,9 @@
                     message: text
                 })
             });
-            const data = await response.json();
-            if (data.success) {
-                addMessageToView(data.message, true);
+            const result = await response.json();
+            if (result.success) {
+                addMessageToView(result.data.message, true);
                 scrollToBottom();
             }
         } catch (error) {

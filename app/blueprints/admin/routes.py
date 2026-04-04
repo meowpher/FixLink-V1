@@ -4,22 +4,15 @@ Admin Routes Blueprint - Maintenance Dashboard
 from functools import wraps
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
-from sqlalchemy import or_
+from sqlalchemy import or_, func, case
 from ... import db
 from ...models import Building, Floor, Room, Asset, Ticket, User, Professional, HelpRequest, ChatMessage
 from ...utils import send_ticket_email
+from ...decorators import admin_required
+from ...analytics import get_technician_efficiency, get_system_trends, get_critical_assets
+from ...api_utils import handle_api_errors, api_response
 
 admin_bp = Blueprint('admin', __name__)
-
-def admin_required(f):
-    """Decorator to require admin login."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session or not session.get('is_admin'):
-            flash('Admin access required.', 'error')
-            return redirect(url_for('auth.login'))
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 @admin_bp.route('/')
@@ -29,6 +22,7 @@ def dashboard():
     # Get filter parameters
     status_filter = request.args.get('status', 'all')
     floor_filter = request.args.get('floor', 'all')
+    category_filter = request.args.get('category', 'all')
     
     # Base query
     query = Ticket.query
@@ -41,6 +35,19 @@ def dashboard():
     
     if floor_filter != 'all':
         query = query.join(Room).filter(Room.floor_id == int(floor_filter))
+        
+    if category_filter != 'all':
+        # Map frontend category groups to specific issue types
+        if category_filter == 'electrician':
+            query = query.filter(Ticket.issue_type.in_(['electrical', 'ac', 'lighting', 'lift_breakdown', 'light_broken']))
+        elif category_filter == 'plumber':
+            query = query.filter(Ticket.issue_type == 'plumbing')
+        elif category_filter == 'it_technician':
+            query = query.filter(Ticket.issue_type.in_(['projector', 'computer']))
+        elif category_filter == 'carpenter':
+            query = query.filter(Ticket.issue_type.in_(['furniture', 'door_error']))
+        elif category_filter == 'other':
+            query = query.filter(Ticket.issue_type.in_(['cleaning', 'other']))
     
     tickets = query.order_by(Ticket.created_at.desc()).all()
     
@@ -72,18 +79,29 @@ def dashboard():
     if vyas:
         floors = Floor.query.filter_by(building_id=vyas.id).order_by(Floor.level).all()
     
+    # Unified categories for the filter dropdown
+    categories = [
+        {'id': 'electrician', 'name': 'Electrical / AC / Lifts'},
+        {'id': 'plumber', 'name': 'Plumbing'},
+        {'id': 'it_technician', 'name': 'IT / Computer / AV'},
+        {'id': 'carpenter', 'name': 'Furniture / Doors'},
+        {'id': 'other', 'name': 'Others'}
+    ]
+    
     return render_template('admin.html',
                          tickets=tickets,
                          stats=stats,
                          floors=floors,
+                         categories=categories,
                          status_filter=status_filter,
-                         floor_filter=floor_filter)
+                         floor_filter=floor_filter,
+                         category_filter=category_filter)
 
 
 @admin_bp.route('/map')
 @admin_required
 def status_map():
-    """Visual status map showing all floors with room status."""
+    """Visual status map showing all floors with room status - Optimized."""
     floor_id = request.args.get('floor', type=int)
     
     # Get Vyas building and floors
@@ -98,11 +116,14 @@ def status_map():
         if floor_id:
             selected_floor = Floor.query.get(floor_id)
         elif floors:
-            # Default to 4th floor if available, else first floor
             selected_floor = next((f for f in floors if f.level == 4), floors[0])
         
         if selected_floor:
-            rooms = Room.query.filter_by(floor_id=selected_floor.id).all()
+            from sqlalchemy.orm import joinedload
+            rooms = Room.query.options(
+                joinedload(Room.tickets),
+                joinedload(Room.assets)
+            ).filter_by(floor_id=selected_floor.id).all()
     
     return render_template('status_map.html',
                          floors=floors,
@@ -115,6 +136,8 @@ def status_map():
 def history():
     """Admin history page - view fixed tickets with search filtering."""
     search_query = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = 15
     
     # Base query for all fixed tickets
     query = Ticket.query.filter_by(status=Ticket.STATUS_FIXED)
@@ -129,12 +152,16 @@ def history():
             )
         )
     
-    # Order by fixed date descending
-    tickets = query.order_by(Ticket.fixed_at.desc(), Ticket.created_at.desc()).all()
+    # Order by fixed date descending and paginate
+    pagination = query.order_by(Ticket.fixed_at.desc(), Ticket.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False)
+    
+    tickets = pagination.items
     
     return render_template('admin_history.html', 
-                         tickets=tickets, 
-                         search_query=search_query)
+                          tickets=tickets, 
+                          pagination=pagination,
+                          search_query=search_query)
 
 
 @admin_bp.route('/users')
@@ -192,8 +219,55 @@ def users():
                            sort=sort_filter)
 
 
+@admin_bp.route('/analytics')
+@admin_required
+def analytics():
+    """Admin analytics and insights dashboard."""
+    # 1. Total Stats
+    total_tickets = Ticket.query.count()
+    fixed_tickets_count = Ticket.query.filter_by(status=Ticket.STATUS_FIXED).count()
+    
+    # 2. Tickets by Category
+    category_counts = db.session.query(
+        Ticket.issue_type, func.count(Ticket.id)
+    ).group_by(Ticket.issue_type).all()
+    
+    # 3. Average Resolution Time (Fixed tickets)
+    avg_res_time = 0
+    fixed_tickets = Ticket.query.filter(
+        Ticket.status == Ticket.STATUS_FIXED,
+        Ticket.fixed_at.isnot(None)
+    ).all()
+    
+    if fixed_tickets:
+        durations = [(t.fixed_at - t.created_at).total_seconds() for t in fixed_tickets]
+        avg_res_time = round(sum(durations) / (3600 * len(durations)), 1) # in hours
+
+    # 4. Performance: Success Rate
+    success_rate = round((fixed_tickets_count / total_tickets * 100), 1) if total_tickets > 0 else 0
+
+    # 5. Monthly Trend (Last 6 Months)
+    six_months_ago = datetime.utcnow() - timedelta(days=180)
+    monthly_trend_query = db.session.query(
+        func.to_char(Ticket.created_at, 'YYYY-MM').label('month'),
+        func.count(Ticket.id)
+    ).filter(Ticket.created_at >= six_months_ago).group_by('month').order_by('month').all()
+    
+    # Convert Row objects to serializable lists
+    monthly_trend = [list(row) for row in monthly_trend_query]
+
+    return render_template('admin_analytics.html',
+                          total_tickets=total_tickets,
+                          fixed_count=fixed_tickets_count,
+                          category_data=dict(category_counts),
+                          avg_res_time=avg_res_time,
+                          success_rate=success_rate,
+                          monthly_trend=monthly_trend)
+
+
 @admin_bp.route('/users/<int:user_id>/edit', methods=['POST'])
 @admin_required
+@handle_api_errors
 def edit_user(user_id):
     """Edit user details (AJAX)."""
     user = User.query.get_or_404(user_id)
@@ -202,59 +276,50 @@ def edit_user(user_id):
     email = data.get('email', '').strip().lower()
     if email != user.email:
         if User.query.filter_by(email=email).first():
-            return jsonify({'success': False, 'error': 'Email already registered.'}), 400
+            return api_response(success=False, error="Email already registered.", status=400)
             
-    try:
-        user.name = data.get('name', '').strip()
-        user.email = email
-        user.prn = data.get('prn', '').strip()
-        user.is_admin = data.get('role') == 'admin'
+    user.name = data.get('name', '').strip()
+    user.email = email
+    user.prn = data.get('prn', '').strip()
+    user.is_admin = data.get('role') == 'admin'
+    
+    password = data.get('password')
+    if password:
+        user.set_password(password)
         
-        password = data.get('password')
-        if password:
-            user.set_password(password)
-            
-        db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    db.session.commit()
+    return api_response(message="User updated successfully")
 
 
 @admin_bp.route('/users/<int:user_id>/delete', methods=['POST'])
 @admin_required
+@handle_api_errors
 def delete_user(user_id):
     """Delete a user (AJAX)."""
     if user_id == session.get('user_id'):
-        return jsonify({'success': False, 'error': 'Cannot delete yourself.'}), 400
+        return api_response(success=False, error="Cannot delete yourself.", status=400)
         
     user = User.query.get_or_404(user_id)
-    try:
-        db.session.delete(user)
-        db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    db.session.delete(user)
+    db.session.commit()
+    return api_response(message="User deleted successfully")
 
 
 @admin_bp.route('/users/<int:user_id>/verify', methods=['POST'])
 @admin_required
+@handle_api_errors
 def verify_user_manual(user_id):
     """Manually verify a user (AJAX)."""
     user = User.query.get_or_404(user_id)
-    try:
-        user.is_verified = True
-        user.verification_token = None
-        db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    user.is_verified = True
+    user.verification_token = None
+    db.session.commit()
+    return api_response(message="User verified successfully")
 
 
 @admin_bp.route('/tickets/<int:ticket_id>/update-status', methods=['POST'])
 @admin_required
+@handle_api_errors
 def update_ticket_status(ticket_id):
     """Update ticket status (AJAX endpoint)."""
     ticket = Ticket.query.get_or_404(ticket_id)
@@ -262,92 +327,181 @@ def update_ticket_status(ticket_id):
     new_status = data.get('status')
     
     if new_status not in Ticket.STATUS_CHOICES:
-        return jsonify({'success': False, 'error': 'Invalid status'}), 400
+        return api_response(success=False, error="Invalid status", status=400)
     
-    try:
-        ticket.status = new_status
-        ticket.updated_at = datetime.utcnow()
-        
-        # If marking as fixed, update asset status and set fixed_at
-        if new_status == Ticket.STATUS_FIXED:
-            ticket.fixed_at = datetime.utcnow()
-            if ticket.asset_id:
-                asset = Asset.query.get(ticket.asset_id)
-                if asset:
-                    asset.status = Asset.STATUS_WORKING
-        
-        db.session.commit()
-        
-        # Trigger EmailJS notification for ticket update
-        send_ticket_email(ticket, action=new_status)
-        
-        return jsonify({
-            'success': True,
+    ticket.status = new_status
+    ticket.updated_at = datetime.utcnow()
+    
+    # If marking as fixed, update asset status and set fixed_at
+    if new_status == Ticket.STATUS_FIXED:
+        ticket.fixed_at = datetime.utcnow()
+        if ticket.asset_id:
+            asset = Asset.query.get(ticket.asset_id)
+            if asset:
+                asset.status = Asset.STATUS_WORKING
+    
+    db.session.commit()
+    
+    # Invalidate map cache for affected floor
+    if ticket.room_id:
+        room = Room.query.get(ticket.room_id)
+        if room:
+            from ...cache import invalidate_floor_cache
+            invalidate_floor_cache(room.floor_id)
+    
+    # Trigger EmailJS notification for ticket update
+    send_ticket_email(ticket, action=new_status)
+    
+    return api_response(
+        data={
             'ticket_id': ticket.id,
-            'status': ticket.status,
-            'message': f'Ticket #{ticket.id} marked as {new_status}'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+            'status': ticket.status
+        },
+        message=f"Ticket #{ticket.id} marked as {new_status}"
+    )
 
 
 @admin_bp.route('/ticket/<int:ticket_id>')
 @admin_required
+@handle_api_errors
 def get_ticket_detail(ticket_id):
     """Get ticket details for modal (AJAX)."""
     ticket = Ticket.query.get_or_404(ticket_id)
-    return jsonify({
-        'success': True,
-        'ticket': ticket.to_dict()
-    })
+    return api_response(data={'ticket': ticket.to_dict()})
 
 
 @admin_bp.route('/floor-data/<int:floor_id>')
 @admin_required
+@handle_api_errors
 def get_floor_data(floor_id):
-    """Get floor data with room statuses for map (AJAX)."""
-    floor = Floor.query.get_or_404(floor_id)
-    rooms = Room.query.filter_by(floor_id=floor_id).all()
+    """Get floor data with room statuses for map (AJAX) - Optimized."""
+    from ...cache import cache
     
-    return jsonify({
-        'success': True,
+    cache_key = f'admin_floor_{floor_id}'
+    cached = cache.get(cache_key)
+    if cached:
+        return api_response(data=cached)
+    
+    floor = Floor.query.get_or_404(floor_id)
+    
+    from sqlalchemy.orm import joinedload
+    rooms = Room.query.options(
+        joinedload(Room.tickets),
+        joinedload(Room.assets)
+    ).filter_by(floor_id=floor_id).all()
+    
+    result = {
         'floor': floor.to_dict(),
-        'rooms': [{
-            **room.to_dict(),
-            'status': room.status,
-            'has_open_tickets': room.has_open_tickets,
-            'has_broken_assets': room.has_broken_assets
-        } for room in rooms]
+        'rooms': [room.to_map_dict() for room in rooms]
+    }
+    
+    cache.set(cache_key, result, timeout=3600)  # 60 minutes
+    return api_response(data=result)
+
+
+@admin_bp.route('/api/room-status/<room_number>')
+@admin_required
+@handle_api_errors
+def api_room_status(room_number):
+    """Detailed room status for the interactive map (AJAX)."""
+    room = Room.query.filter_by(number=room_number.upper()).first_or_404()
+    
+    # Get active ticket (open, assigned, or in-progress)
+    active_ticket = Ticket.query.filter(
+        Ticket.room_id == room.id,
+        Ticket.status.in_([Ticket.STATUS_OPEN, Ticket.STATUS_ASSIGNED, Ticket.STATUS_IN_PROGRESS])
+    ).order_by(Ticket.created_at.desc()).first()
+    
+    # Get all active professionals for assignment
+    all_profs = Professional.query.filter_by(is_active=True).all()
+    profs_by_category = {}
+    
+    category_names = {
+        Professional.CATEGORY_IT: 'IT Technician',
+        Professional.CATEGORY_ELECTRICIAN: 'Electrician',
+        Professional.CATEGORY_PLUMBER: 'Plumber',
+        Professional.CATEGORY_CARPENTER: 'Carpenter'
+    }
+    
+    for p in all_profs:
+        cat_name = category_names.get(p.category, p.category.title())
+        if cat_name not in profs_by_category:
+            profs_by_category[cat_name] = []
+        profs_by_category[cat_name].append({
+            'id': p.id,
+            'name': p.name
+        })
+    
+    return api_response(data={
+        'room': room.to_dict(),
+        'status': room.status,
+        'active_ticket': active_ticket.to_dict() if active_ticket else None,
+        'professionals': profs_by_category
     })
+
+
+@admin_bp.route('/api/ticket/<int:ticket_id>/assign', methods=['POST'])
+@admin_required
+@handle_api_errors
+def api_assign_ticket(ticket_id):
+    """Assign a ticket to a professional via AJAX."""
+    from datetime import datetime, timedelta
+    from ...cache import invalidate_floor_cache
+    
+    ticket = Ticket.query.get_or_404(ticket_id)
+    data = request.get_json()
+    
+    professional_id = data.get('professional_id')
+    time_limit_hours = int(data.get('time_limit_hours', 2))
+    
+    if not professional_id:
+        return api_response(success=False, error="Please select a professional", status=400)
+        
+    professional = Professional.query.get(professional_id)
+    if not professional or not professional.is_active:
+        return api_response(success=False, error="Selected professional is not available", status=400)
+        
+    # Check if professional already has an active task
+    active_task = Ticket.query.filter(
+        Ticket.assigned_professional_id == professional_id,
+        Ticket.status.in_([Ticket.STATUS_ASSIGNED, Ticket.STATUS_IN_PROGRESS])
+    ).first()
+    
+    if active_task:
+        return api_response(success=False, error=f"{professional.name} already has an active task (# {active_task.id}).", status=400)
+
+    ticket.assigned_professional_id = professional_id
+    ticket.time_limit_hours = time_limit_hours
+    ticket.deadline_datetime = datetime.utcnow() + timedelta(hours=time_limit_hours)
+    ticket.status = Ticket.STATUS_ASSIGNED
+    
+    db.session.commit()
+    
+    # Invalidate cache for the floor
+    if ticket.room_id:
+        invalidate_floor_cache(ticket.room.floor_id)
+        
+    return api_response(message="Technician assigned successfully")
 
 
 @admin_bp.route('/tickets/<int:ticket_id>/delete', methods=['POST'])
 @admin_required
+@handle_api_errors
 def delete_ticket(ticket_id):
     """Delete a ticket (AJAX endpoint)."""
     ticket = Ticket.query.get_or_404(ticket_id)
-    try:
-        # Delete associated image if it exists
-        if ticket.image_filename:
-            import os
-            from flask import current_app
-            file_path = os.path.join(current_app.root_path, 'static', 'uploads', ticket.image_filename)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                
-        db.session.delete(ticket)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': f'Ticket #{ticket.id} deleted successfully'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    # Delete associated image if it exists
+    if ticket.image_filename:
+        import os
+        from flask import current_app
+        file_path = os.path.join(current_app.root_path, 'static', 'uploads', ticket.image_filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            
+    db.session.delete(ticket)
+    db.session.commit()
+    
+    return api_response(message=f"Ticket #{ticket.id} deleted successfully")
 
 
 # ==================== PROFESSIONAL MANAGEMENT ====================
@@ -499,6 +653,7 @@ def add_professional():
 
 @admin_bp.route('/professionals/<int:professional_id>/edit', methods=['POST'])
 @admin_required
+@handle_api_errors
 def edit_professional(professional_id):
     """Edit professional details (AJAX)."""
     professional = Professional.query.get_or_404(professional_id)
@@ -507,32 +662,29 @@ def edit_professional(professional_id):
     email = data.get('email', '').strip().lower()
     if email != professional.email:
         if Professional.query.filter_by(email=email).first():
-            return jsonify({'success': False, 'error': 'Email already registered.'}), 400
+            return api_response(success=False, error="Email already registered.", status=400)
     
-    try:
-        professional.name = data.get('name', '').strip()
-        professional.email = email
-        professional.phone = data.get('phone', '').strip()
-        
-        new_category = data.get('category')
-        if new_category in Professional.CATEGORIES:
-            professional.category = new_category
-        
-        professional.is_active = data.get('is_active', professional.is_active)
-        
-        password = data.get('password')
-        if password:
-            professional.set_password(password)
-        
-        db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    professional.name = data.get('name', '').strip()
+    professional.email = email
+    professional.phone = data.get('phone', '').strip()
+    
+    new_category = data.get('category')
+    if new_category in Professional.CATEGORIES:
+        professional.category = new_category
+    
+    professional.is_active = data.get('is_active', professional.is_active)
+    
+    password = data.get('password')
+    if password:
+        professional.set_password(password)
+    
+    db.session.commit()
+    return api_response(message="Professional updated successfully")
 
 
 @admin_bp.route('/professionals/<int:professional_id>/delete', methods=['POST'])
 @admin_required
+@handle_api_errors
 def delete_professional(professional_id):
     """Delete a professional (AJAX)."""
     professional = Professional.query.get_or_404(professional_id)
@@ -544,18 +696,15 @@ def delete_professional(professional_id):
     ).count()
     
     if assigned_tickets > 0:
-        return jsonify({
-            'success': False, 
-            'error': f'Cannot delete professional with {assigned_tickets} active tasks. Reassign tasks first.'
-        }), 400
+        return api_response(
+            success=False, 
+            error=f"Cannot delete professional with {assigned_tickets} active tasks. Reassign tasks first.", 
+            status=400
+        )
     
-    try:
-        db.session.delete(professional)
-        db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    db.session.delete(professional)
+    db.session.commit()
+    return api_response(message="Professional deleted successfully")
 
 
 # ==================== TICKET ASSIGNMENT ====================
@@ -644,56 +793,6 @@ def assign_ticket(ticket_id):
                          busy_professional_ids=busy_professional_ids)
 
 
-@admin_bp.route('/api/ticket/<int:ticket_id>/assign', methods=['POST'])
-@admin_required
-def api_assign_ticket(ticket_id):
-    """Assign ticket via API (AJAX)."""
-    ticket = Ticket.query.get_or_404(ticket_id)
-    data = request.get_json()
-    
-    professional_id = data.get('professional_id')
-    time_limit_hours = data.get('time_limit_hours')
-    
-    if not professional_id:
-        return jsonify({'success': False, 'error': 'Professional ID required'}), 400
-    
-    if not time_limit_hours or time_limit_hours < 1:
-        return jsonify({'success': False, 'error': 'Valid time limit required'}), 400
-    
-    professional = Professional.query.get(professional_id)
-    if not professional or not professional.is_active:
-        return jsonify({'success': False, 'error': 'Professional not available'}), 400
-    
-    # Check if professional already has an active task
-    active_task = Ticket.query.filter(
-        Ticket.assigned_professional_id == professional_id,
-        Ticket.status.in_([Ticket.STATUS_ASSIGNED, Ticket.STATUS_IN_PROGRESS])
-    ).first()
-    
-    if active_task:
-        return jsonify({
-            'success': False, 
-            'error': f'{professional.name} already has an active task (# {active_task.id}). They must complete it before being assigned a new one.'
-        }), 400
-    
-    try:
-        ticket.assigned_professional_id = professional_id
-        ticket.time_limit_hours = time_limit_hours
-        ticket.deadline_datetime = datetime.utcnow() + timedelta(hours=time_limit_hours)
-        ticket.status = Ticket.STATUS_ASSIGNED
-        db.session.commit()
-        
-        from ...socket_events import notify_professional_assigned
-        notify_professional_assigned(ticket, professional)
-        
-        return jsonify({
-            'success': True,
-            'message': f'Ticket assigned to {professional.name}',
-            'ticket': ticket.to_dict()
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ==================== HELP REQUEST MANAGEMENT ====================
@@ -704,21 +803,20 @@ def help_requests():
     """View all help requests."""
     status_filter = request.args.get('status', 'pending')
     
-    help_requests_all = HelpRequest.query.all()
+    # Use efficient DB-level aggregation for counts
     counts = {
-        'pending': sum(1 for r in help_requests_all if r.status == 'pending'),
-        'approved': sum(1 for r in help_requests_all if r.status == 'approved'),
-        'rejected': sum(1 for r in help_requests_all if r.status == 'rejected'),
-        'total': len(help_requests_all)
+        'pending': HelpRequest.query.filter_by(status='pending').count(),
+        'approved': HelpRequest.query.filter_by(status='approved').count(),
+        'rejected': HelpRequest.query.filter_by(status='rejected').count(),
+        'total': HelpRequest.query.count()
     }
     
+    # Efficient DB-level filtering and sorting
+    query = HelpRequest.query
     if status_filter != 'all':
-        help_requests_list = [r for r in help_requests_all if r.status == status_filter]
-    else:
-        help_requests_list = help_requests_all
-        
-    # Sort by requested_at desc
-    help_requests_list.sort(key=lambda x: x.requested_at, reverse=True)
+        query = query.filter_by(status=status_filter)
+    
+    help_requests_list = query.order_by(HelpRequest.requested_at.desc()).all()
     
     return render_template('admin/help_requests.html',
                          help_requests=help_requests_list,
@@ -728,6 +826,7 @@ def help_requests():
 
 @admin_bp.route('/api/help-request/<int:help_request_id>/respond', methods=['POST'])
 @admin_required
+@handle_api_errors
 def respond_to_help_request(help_request_id):
     """Approve or reject a help request (AJAX)."""
     help_request = HelpRequest.query.get_or_404(help_request_id)
@@ -737,45 +836,133 @@ def respond_to_help_request(help_request_id):
     helper_professional_id = data.get('helper_professional_id')
     
     if action not in ['approve', 'reject']:
-        return jsonify({'success': False, 'error': 'Invalid action'}), 400
+        return api_response(success=False, error="Invalid action", status=400)
     
     if action == 'approve' and not helper_professional_id:
-        return jsonify({'success': False, 'error': 'Helper professional required for approval'}), 400
+        return api_response(success=False, error="Helper professional required for approval", status=400)
     
-    try:
-        admin = User.query.get(session['user_id'])
+    admin = User.query.get(session['user_id'])
+    
+    if action == 'approve':
+        helper = Professional.query.get(helper_professional_id)
+        if not helper or not helper.is_active:
+            return api_response(success=False, error="Helper professional not available", status=400)
         
-        if action == 'approve':
-            helper = Professional.query.get(helper_professional_id)
-            if not helper or not helper.is_active:
-                return jsonify({'success': False, 'error': 'Helper professional not available'}), 400
-            
-            help_request.status = HelpRequest.STATUS_APPROVED
-            help_request.helper_professional_id = helper_professional_id
-            help_request.admin_id = admin.id
-            help_request.responded_at = datetime.utcnow()
-            
-            from ...socket_events import notify_help_request_approved
-            notify_help_request_approved(help_request)
-            
-        else:
-            help_request.status = HelpRequest.STATUS_REJECTED
-            help_request.admin_id = admin.id
-            help_request.responded_at = datetime.utcnow()
-            
-            from ...socket_events import notify_help_request_rejected
-            notify_help_request_rejected(help_request)
+        help_request.status = HelpRequest.STATUS_APPROVED
+        help_request.helper_professional_id = helper_professional_id
+        help_request.admin_id = admin.id
+        help_request.responded_at = datetime.utcnow()
         
-        db.session.commit()
+        from ...socket_events import notify_help_request_approved
+        notify_help_request_approved(help_request)
         
-        return jsonify({
-            'success': True,
-            'message': f'Help request {action}d successfully',
-            'help_request': help_request.to_dict()
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    else:
+        help_request.status = HelpRequest.STATUS_REJECTED
+        help_request.admin_id = admin.id
+        help_request.responded_at = datetime.utcnow()
+        
+        from ...socket_events import notify_help_request_rejected
+        notify_help_request_rejected(help_request)
+    
+    db.session.commit()
+    return api_response(message=f"Help request {action}d successfully")
+
+
+# ==================== ANALYTICS & REPORTS ====================
+
+@admin_bp.route('/analytics')
+@admin_required
+def analytics_dashboard():
+    """View advanced analytics and predictive maintenance dashboard."""
+    return render_template('admin/analytics.html',
+                         tech_stats=get_technician_efficiency(),
+                         system_trends=get_system_trends(7),
+                         critical_assets=get_critical_assets(10))
+
+@admin_bp.route('/reports/export/<string:fmt>')
+@admin_required
+def export_report(fmt):
+    """Export maintenance data as PDF or CSV."""
+    import pandas as pd
+    from flask import make_response
+    from io import BytesIO, StringIO
+    
+    # Fetch all tickets for report
+    tickets = Ticket.query.order_by(Ticket.created_at.desc()).all()
+    data = [t.to_dict() for t in tickets]
+    if not data:
+        flash('No data available for export.', 'info')
+        return redirect(url_for('admin.dashboard'))
+        
+    df = pd.DataFrame(data)
+    
+    # Format dates for export
+    date_cols = ['created_at', 'updated_at', 'job_started_at', 'job_completed_at', 'fixed_at', 'deadline_datetime']
+    for col in date_cols:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col]).dt.strftime('%Y-%m-%d %H:%M:%S')
+
+    if fmt == 'csv':
+        output = StringIO()
+        df.to_csv(output, index=False)
+        response = make_response(output.getvalue())
+        response.headers["Content-Disposition"] = f"attachment; filename=fixlink_report_{datetime.now().strftime('%Y%m%d')}.csv"
+        response.headers["Content-type"] = "text/csv"
+        return response
+    
+    elif fmt == 'pdf':
+        from fpdf import FPDF
+        
+        class PDF(FPDF):
+            def header(self):
+                self.set_font('helvetica', 'B', 15)
+                self.cell(0, 10, 'MIT-WPU FixLink Maintenance Report', border=False, align='C')
+                self.ln(10)
+                self.set_font('helvetica', 'I', 10)
+                self.cell(0, 10, f'Generated on: {datetime.now().strftime("%Y-%m-%d %H:%M")}', border=False, align='C')
+                self.ln(20)
+
+            def footer(self):
+                self.set_y(-15)
+                self.set_font('helvetica', 'I', 8)
+                self.cell(0, 10, f'Page {self.page_no()}/{{nb}}', align='C')
+
+        pdf = PDF()
+        pdf.add_page()
+        pdf.set_font('helvetica', '', 10)
+        
+        # Summary Section
+        pdf.set_font('helvetica', 'B', 12)
+        pdf.cell(0, 10, 'Summary Statistics', ln=True)
+        pdf.set_font('helvetica', '', 10)
+        pdf.cell(0, 7, f'Total Tickets: {len(df)}', ln=True)
+        pdf.cell(0, 7, f'Critical Assets Identified: {len(get_critical_assets())}', ln=True)
+        pdf.ln(10)
+        
+        # Table Header
+        pdf.set_font('helvetica', 'B', 10)
+        pdf.set_fill_color(200, 220, 255)
+        pdf.cell(20, 10, 'ID', border=1, fill=True)
+        pdf.cell(40, 10, 'Room', border=1, fill=True)
+        pdf.cell(40, 10, 'Status', border=1, fill=True)
+        pdf.cell(90, 10, 'Issue', border=1, fill=True)
+        pdf.ln()
+        
+        # Table Rows
+        pdf.set_font('helvetica', '', 9)
+        for _, row in df.head(50).iterrows(): # Limit to first 50 for performance
+            pdf.cell(20, 8, str(row['id']), border=1)
+            pdf.cell(40, 8, str(row['room_number']), border=1)
+            pdf.cell(40, 8, str(row['status']), border=1)
+            pdf.cell(90, 8, str(row['issue_type']), border=1)
+            pdf.ln()
+            
+        response = make_response(pdf.output())
+        response.headers["Content-Disposition"] = f"attachment; filename=fixlink_report_{datetime.now().strftime('%Y%m%d')}.pdf"
+        response.headers["Content-type"] = "application/pdf"
+        return response
+
+    return redirect(url_for('admin.dashboard'))
 
 
 # ==================== CHAT ENDPOINTS ====================
@@ -790,8 +977,10 @@ def chat():
 
 @admin_bp.route('/api/chat/professionals')
 @admin_required
+@handle_api_errors
 def get_professionals_for_chat():
     """Get list of professionals for admin to chat with."""
+    from ...models import ChatMessage
     professionals = Professional.query.filter_by(is_active=True).all()
     
     result = []
@@ -810,13 +999,15 @@ def get_professionals_for_chat():
             'unread_count': unread_count
         })
     
-    return jsonify({'success': True, 'professionals': result})
+    return api_response(data={'professionals': result})
 
 
 @admin_bp.route('/api/chat/history/<int:professional_id>')
 @admin_required
+@handle_api_errors
 def get_chat_history_with_professional(professional_id):
     """Get chat history with a specific professional."""
+    from ...models import ChatMessage
     admin = User.query.get(session['user_id'])
     professional = Professional.query.get_or_404(professional_id)
     
@@ -837,8 +1028,7 @@ def get_chat_history_with_professional(professional_id):
             msg.is_read = True
     db.session.commit()
     
-    return jsonify({
-        'success': True,
+    return api_response(data={
         'messages': [msg.to_dict() for msg in messages],
         'professional': professional.to_dict()
     })
@@ -846,63 +1036,48 @@ def get_chat_history_with_professional(professional_id):
 
 @admin_bp.route('/api/chat/send', methods=['POST'])
 @admin_required
+@handle_api_errors
 def admin_send_chat_message():
     """Admin sends a chat message to professional."""
+    from ...models import ChatMessage
+    from ...api_utils import validate_json
+    
     admin = User.query.get(session['user_id'])
-    data = request.get_json()
+    data, error = validate_json(['professional_id', 'message'])
+    if error: return error
     
     professional_id = data.get('professional_id')
     message_text = data.get('message', '').strip()
     
-    if not professional_id or not message_text:
-        return jsonify({'success': False, 'error': 'Professional ID and message required'}), 400
-    
     professional = Professional.query.get(professional_id)
     if not professional:
-        return jsonify({'success': False, 'error': 'Professional not found'}), 404
+        return api_response(success=False, error="Professional not found", status=404)
     
-    try:
-        chat_message = ChatMessage(
-            sender_type=ChatMessage.SENDER_TYPE_ADMIN,
-            sender_id=admin.id,
-            receiver_type=ChatMessage.SENDER_TYPE_PROFESSIONAL,
-            receiver_id=professional_id,
-            message=message_text
-        )
-        db.session.add(chat_message)
-        db.session.commit()
-        
-        from .socket_events import emit_chat_message
-        emit_chat_message(chat_message)
-        
-        return jsonify({
-            'success': True,
-            'message': chat_message.to_dict()
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    chat_message = ChatMessage(
+        sender_type=ChatMessage.SENDER_TYPE_ADMIN,
+        sender_id=admin.id,
+        receiver_type=ChatMessage.SENDER_TYPE_PROFESSIONAL,
+        receiver_id=professional_id,
+        message=message_text
+    )
+    db.session.add(chat_message)
+    db.session.commit()
+    
+    from ...socket_events import emit_chat_message
+    emit_chat_message(chat_message)
+    
+    return api_response(data={'message': chat_message.to_dict()})
 
 
 @admin_bp.route('/api/chat/reset/<int:prof_id>', methods=['POST'])
 @admin_required
+@handle_api_errors
 def reset_professional_chat(prof_id):
     """Reset chat history for a specific professional."""
-    from .models import User
-    user_id = session.get('user_id')
-    user = User.query.get(user_id) if user_id else None
-    
-    if not user or not user.is_admin:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    try:
-        from .models import ChatMessage
-        ChatMessage.query.filter(
-            ((ChatMessage.sender_type == ChatMessage.SENDER_TYPE_PROFESSIONAL) & (ChatMessage.sender_id == prof_id)) |
-            ((ChatMessage.receiver_type == ChatMessage.SENDER_TYPE_PROFESSIONAL) & (ChatMessage.receiver_id == prof_id))
-        ).delete(synchronize_session=False)
-        db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    from ...models import ChatMessage
+    ChatMessage.query.filter(
+        ((ChatMessage.sender_type == ChatMessage.SENDER_TYPE_PROFESSIONAL) & (ChatMessage.sender_id == prof_id)) |
+        ((ChatMessage.receiver_type == ChatMessage.SENDER_TYPE_PROFESSIONAL) & (ChatMessage.receiver_id == prof_id))
+    ).delete(synchronize_session=False)
+    db.session.commit()
+    return api_response(message="Chat history reset successfully")

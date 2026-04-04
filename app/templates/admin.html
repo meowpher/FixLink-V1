@@ -14,20 +14,7 @@
                 <p class="admin-subtitle">Vyas Building Maintenance Management</p>
             </div>
             <div class="col-md-6 text-md-end">
-                <div class="admin-actions">
-                    <a href="{{ url_for('admin.status_map') }}" class="btn btn-outline-light me-2">
-                        <i class="bi bi-map me-1"></i>Status Map
-                    </a>
-                    <a href="{{ url_for('admin.history') }}" class="btn btn-outline-light me-2">
-                        <i class="bi bi-clock-history me-1"></i>History
-                    </a>
-                    <a href="{{ url_for('admin.professionals') }}" class="btn btn-outline-light me-2">
-                        <i class="bi bi-people me-1"></i>Professionals
-                    </a>
-                    <a href="{{ url_for('admin.help_requests') }}" class="btn btn-outline-light">
-                        <i class="bi bi-hand-thumbs-up me-1"></i>Help Requests
-                    </a>
-                </div>
+                <!-- Actions moved to primary navbar -->
             </div>
         </div>
     </div>
@@ -101,15 +88,17 @@
     <div class="container">
         <div class="filter-card">
             <form method="GET" action="{{ url_for('admin.dashboard') }}" class="row g-3 align-items-end">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label for="status" class="form-label">Status</label>
                     <select class="form-select" id="status" name="status">
                         <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
-                        <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open</option>
+                        <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open / Cancelled</option>
+                        <option value="assigned" {% if status_filter == 'assigned' %}selected{% endif %}>Assigned</option>
                         <option value="in-progress" {% if status_filter == 'in-progress' %}selected{% endif %}>In Progress</option>
+                        <option value="fixed" {% if status_filter == 'fixed' %}selected{% endif %}>Fixed</option>
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label for="floor" class="form-label">Floor</label>
                     <select class="form-select" id="floor" name="floor">
                         <option value="all" {% if floor_filter == 'all' %}selected{% endif %}>All Floors</option>
@@ -120,7 +109,18 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label for="category" class="form-label">Category</label>
+                    <select class="form-select" id="category" name="category">
+                        <option value="all" {% if category_filter == 'all' %}selected{% endif %}>All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if category_filter == cat.id %}selected{% endif %}>
+                            {{ cat.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="bi bi-funnel me-1"></i>Apply Filters
                     </button>
@@ -158,7 +158,7 @@
                         <tbody>
                             {% set filtered_tickets = tickets | selectattr('status', 'in', status_list) | list %}
                             {% for ticket in filtered_tickets %}
-                            <tr data-ticket-id="{{ ticket.id }}" class="clickable-row" onclick="viewTicket({{ ticket.id }})">
+                            <tr data-ticket-id="{{ ticket.id }}" class="clickable-row" onclick="viewTicket(this.dataset.ticketId)">
                                 <td>
                                     <span class="ticket-id">#{{ ticket.id }}</span>
                                 </td>
@@ -186,7 +186,8 @@
                                     <div class="status-badge-container">
                                         {% if ticket.status == 'cancelled' %}
                                         <button class="status-badge status-cancelled clickable-badge shadow-sm" 
-                                                onclick="event.stopPropagation(); viewCancellationReport({{ ticket.id }})"
+                                                data-ticket-id="{{ ticket.id }}"
+                                                onclick="event.stopPropagation(); viewCancellationReport(this.dataset.ticketId)"
                                                 title="View Cancellation Report">
                                             <i class="bi bi-exclamation-triangle-fill me-1"></i> CANCELLED
                                         </button>
@@ -222,18 +223,24 @@
                                         </span>
                                         {% endif %}
                                         {% if ticket.status in ['open', 'cancelled'] %}
-                                        <button class="btn btn-sm btn-warning" onclick="event.stopPropagation(); updateStatus({{ ticket.id }}, 'in-progress')" 
+                                        <button class="btn btn-sm btn-warning" 
+                                                data-ticket-id="{{ ticket.id }}"
+                                                onclick="event.stopPropagation(); updateStatus(this.dataset.ticketId, 'in-progress')" 
                                                 title="Mark In Progress">
                                             <i class="bi bi-arrow-repeat"></i>
                                         </button>
                                         {% endif %}
                                         {% if ticket.status != 'fixed' %}
-                                        <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); updateStatus({{ ticket.id }}, 'fixed')" 
+                                        <button class="btn btn-sm btn-success" 
+                                                data-ticket-id="{{ ticket.id }}"
+                                                onclick="event.stopPropagation(); updateStatus(this.dataset.ticketId, 'fixed')" 
                                                 title="Mark Fixed">
                                             <i class="bi bi-check-lg"></i>
                                         </button>
                                         {% endif %}
-                                        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteTicket({{ ticket.id }})" 
+                                        <button class="btn btn-sm btn-danger" 
+                                                data-ticket-id="{{ ticket.id }}"
+                                                onclick="event.stopPropagation(); deleteTicket(this.dataset.ticketId)" 
                                                 title="Delete Ticket">
                                             <i class="bi bi-trash"></i>
                                         </button>
@@ -346,7 +353,79 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
+    // Socket.IO Integration
+    let socket;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        initSocket();
+    });
+
+    function initSocket() {
+        try {
+            socket = io();
+            
+            // Listen for new tickets
+            socket.on('new_ticket', function(data) {
+                showToast(`New Report: Ticket #${data.ticket_id} in Room ${data.ticket_number}`, 'danger');
+                // Auto-refresh to show new ticket if it matches filters
+                setTimeout(() => location.reload(), 3000);
+            });
+            
+            // Listen for job starts
+            socket.on('job_started', function(data) {
+                showToast(`Job Started: Technician ${data.professional_name} started Ticket #${data.ticket_id}`, 'warning');
+                setTimeout(() => location.reload(), 3000);
+            });
+            
+            // Listen for job completions
+            socket.on('job_completed', function(data) {
+                showToast(`Job Finished: Ticket #${data.ticket_id} marked as Fixed by ${data.professional_name}`, 'success');
+                setTimeout(() => location.reload(), 3000);
+            });
+            
+            // Listen for job cancellations
+            socket.on('job_cancelled', function(data) {
+                showToast(`JOB CANCELLED: Ticket #${data.ticket_id} was cancelled by ${data.professional_name}`, 'danger');
+                setTimeout(() => location.reload(), 3000);
+            });
+            
+        } catch (e) {
+            console.error('Socket init failed:', e);
+        }
+    }
+
+    function showToast(message, type) {
+        const toastContainer = document.getElementById('toast-container') || createToastContainer();
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type} alert-dismissible fade show shadow-lg border-0 mb-2`;
+        toast.style.borderRadius = '12px';
+        toast.style.minWidth = '300px';
+        toast.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="bi bi-info-circle-fill me-2"></i>
+                <div>${message}</div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        toastContainer.appendChild(toast);
+        
+        setTimeout(() => {
+            const bsToast = new bootstrap.Alert(toast);
+            bsToast.close();
+        }, 5000);
+    }
+
+    function createToastContainer() {
+        const container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'position-fixed top-0 end-0 p-3';
+        container.style.zIndex = '10000';
+        document.body.appendChild(container);
+        return container;
+    }
+
     // Update ticket status via AJAX
     function updateStatus(ticketId, newStatus) {
         if (!confirm(`Are you sure you want to mark this ticket as ${newStatus}?`)) {
@@ -541,5 +620,6 @@
             viewTicket(parseInt(ticketId));
         }
     });
+
 </script>
 {% endblock %}

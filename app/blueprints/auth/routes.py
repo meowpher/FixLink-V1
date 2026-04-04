@@ -9,6 +9,8 @@ from itsdangerous import URLSafeTimedSerializer
 from ... import db
 from ...models import User, Professional
 from ...utils import send_verification_email, send_password_reset_email, ALLOWED_EXTENSIONS, allowed_file
+from ...decorators import user_login_required
+from ...api_utils import handle_api_errors, api_response
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -27,19 +29,6 @@ def confirm_verification_token(token, expiration=3600):
     except:
         return False
     return email
-
-
-def user_login_required(f):
-    """Decorator to require user login (reporter or admin)."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            # Handle AJAX requests by returning 401 JSON instead of redirect
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'errors': ['Session expired. Please log in again.']}), 401
-            return redirect(url_for('auth.login'))
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -246,21 +235,18 @@ def setup_password():
 
 @auth_bp.route('/profile/upload-photo', methods=['POST'])
 @user_login_required
+@handle_api_errors
 def upload_profile_photo():
     """Upload or update user profile photo."""
-    import os
-    from werkzeug.utils import secure_filename
-    from datetime import datetime
-
     if 'photo' not in request.files:
-        return jsonify({'success': False, 'error': 'No file provided'}), 400
+        return api_response(success=False, error="No file provided", status=400)
 
     file = request.files['photo']
     if not file or not file.filename:
-        return jsonify({'success': False, 'error': 'No file selected'}), 400
+        return api_response(success=False, error="No file selected", status=400)
 
     if not allowed_file(file.filename):
-        return jsonify({'success': False, 'error': 'Invalid file type. Use PNG, JPG, GIF or WebP.'}), 400
+        return api_response(success=False, error="Invalid file type. Use PNG, JPG, GIF or WebP.", status=400)
 
     user = User.query.get(session['user_id'])
 
@@ -280,11 +266,12 @@ def upload_profile_photo():
     user.profile_photo = filename
     db.session.commit()
 
-    return jsonify({'success': True, 'photo_url': f"/static/uploads/{filename}"})
+    return api_response(data={'photo_url': f"/static/uploads/{filename}"}, message="Profile photo updated")
 
 
 @auth_bp.route('/profile/remove-photo', methods=['POST'])
 @user_login_required
+@handle_api_errors
 def remove_profile_photo():
     """Remove user profile photo."""
     import os
@@ -295,7 +282,7 @@ def remove_profile_photo():
             os.remove(old_path)
         user.profile_photo = None
         db.session.commit()
-    return jsonify({'success': True})
+    return api_response(message="Profile photo removed")
 
 
 @auth_bp.route('/forgot-password', methods=['GET', 'POST'])
