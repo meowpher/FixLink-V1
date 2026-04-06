@@ -1092,6 +1092,21 @@ body {
     z-index: 10;
 }
 
+/* Status Highlights */
+.room-poly.has-issue {
+    fill: #dc3545 !important;
+    animation: svgPulse 2s infinite;
+}
+
+.room-poly.in-progress {
+    fill: #ffc107 !important;
+    animation: svgPulse 2s infinite;
+}
+
+.room-poly.assigned {
+    fill: #0d6efd !important;
+}
+
 .room-group.selected .room-text {
     font-weight: 800;
 }
@@ -1801,6 +1816,14 @@ body {
 
 .legend-dot.issue {
     background: var(--danger-color);
+}
+
+.legend-dot.in-progress {
+    background: #ffc107;
+}
+
+.legend-dot.assigned {
+    background: #0d6efd;
 }
 
 .legend-dot.selected {

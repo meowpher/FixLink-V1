@@ -6,13 +6,49 @@ from functools import wraps
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer
-from ... import db
+from ... import db, csrf
 from ...models import User, Professional
 from ...utils import send_verification_email, send_password_reset_email, ALLOWED_EXTENSIONS, allowed_file
 from ...decorators import user_login_required
 from ...api_utils import handle_api_errors, api_response
+from ...realtime import get_pusher
 
 auth_bp = Blueprint('auth', __name__)
+
+@auth_bp.route('/pusher/auth', methods=['POST'])
+@csrf.exempt
+def pusher_authentication():
+    """Authenticate private Pusher channels based on user session."""
+    # Exempt from CSRF manually if we can't import csrf easily, 
+    # but the standard way is using the @csrf.exempt decorator.
+    # Since 'csrf' is initialized in app factory, we use the decorator if available.
+    p = get_pusher()
+    if not p:
+        return jsonify({"error": "Pusher not configured"}), 500
+
+    channel_name = request.form.get('channel_name')
+    socket_id = request.form.get('socket_id')
+    
+    # Logic for Admin Private Channels
+    if channel_name == 'private-admins':
+        if 'user_id' in session and session.get('is_admin'):
+            auth = p.authenticate(
+                channel=channel_name,
+                socket_id=socket_id
+            )
+            return jsonify(auth)
+            
+    # Logic for Professional Private Channels
+    if channel_name.startswith('private-professional-'):
+        prof_id_str = channel_name.replace('private-professional-', '')
+        if 'professional_id' in session and str(session.get('professional_id')) == prof_id_str:
+            auth = p.authenticate(
+                channel=channel_name,
+                socket_id=socket_id
+            )
+            return jsonify(auth)
+
+    return jsonify({"error": "Forbidden"}), 403
 
 def generate_verification_token(email):
     serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
@@ -86,6 +122,7 @@ def login():
                 
             session['user_id'] = user.id
             session['user_name'] = user.name
+            session['user_email'] = user.email
             session['is_admin'] = user.is_admin
             
             if user.is_admin:

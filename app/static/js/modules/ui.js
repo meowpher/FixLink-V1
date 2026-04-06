@@ -86,7 +86,6 @@ export function selectRoom(roomNumber, roomId, roomName, roomType) {
     }
 
     // Load dynamic fields
-    loadAssets(roomId);
     updateIssueTypes(roomType || 'unknown');
 }
 
@@ -112,37 +111,11 @@ export function updateIssueTypes(roomType) {
 }
 
 /**
- * Load assets belonging to the selected room.
- * @param {number} roomId 
- */
-export async function loadAssets(roomId) {
-    const assetSelect = document.getElementById('asset_id');
-    if (!assetSelect) return;
-
-    try {
-        const data = await fetchAssetsByRoom(roomId);
-        const assets = data.assets || data.data.assets;
-        
-        assetSelect.innerHTML = '<option value="">Select Asset (Optional)</option>';
-        assets.forEach(asset => {
-            const option = document.createElement('option');
-            option.value = asset.id;
-            option.textContent = `${asset.name} (${asset.asset_type})`;
-            assetSelect.appendChild(option);
-        });
-        assetSelect.disabled = false;
-    } catch (error) {
-        console.error('Error loading assets:', error);
-    }
-}
-
-/**
  * Clear the current room selection.
  */
 export function resetRoomSelection() {
     const roomInput = document.getElementById('room_id');
     const display = document.getElementById('selectedRoomDisplay');
-    const assetSelect = document.getElementById('asset_id');
 
     if (roomInput) roomInput.value = '';
     if (display) {
@@ -152,10 +125,6 @@ export function resetRoomSelection() {
                 <span>No room selected</span>
             </div>
         `;
-    }
-    if (assetSelect) {
-        assetSelect.innerHTML = '<option value="">Select Asset</option>';
-        assetSelect.disabled = true;
     }
 
     document.querySelectorAll('.room-block, .room-group, .room-poly').forEach(block => {

@@ -396,51 +396,70 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<!-- Pusher Integration -->
+<script src="https://js.pusher.com/8.0.1/pusher.min.js"></script>
 <script>
-    let socket;
+    let pusher;
+    let channel;
     let helpRequestModal;
     
     document.addEventListener('DOMContentLoaded', function() {
-        // Safe SocketIO initialization
-        try {
-            if (typeof io !== 'undefined') {
-                socket = io();
-                setupSocketListeners();
-            } else {
-                console.warn('Socket.IO not loaded. Real-time updates will be unavailable.');
-            }
-        } catch (e) {
-            console.error('Socket.IO init error:', e);
-        }
+        initPusher();
 
         // Initialize modals
         const helpRequestModalEl = document.getElementById('helpRequestModal');
         if (helpRequestModalEl) helpRequestModal = new bootstrap.Modal(helpRequestModalEl);
     });
 
-    function setupSocketListeners() {
-        if (!socket) return;
+    function initPusher() {
+        if (!'{{ PUSHER_KEY }}') {
+            console.warn('Pusher key missing from configuration.');
+            return;
+        }
 
-        socket.on('new_assignment', function(data) {
-            showToast(`New task assigned! Ticket #${data.ticket_id}`, 'info');
-            setTimeout(() => location.reload(), 2000);
-        });
-        
-        socket.on('help_approved', function(data) {
-            showToast(`Help request approved! ${data.helper_name} will assist you.`, 'success');
-            setTimeout(() => location.reload(), 2000);
-        });
-        
-        socket.on('help_rejected', function(data) {
-            showToast('Help request was rejected.', 'warning');
-            setTimeout(() => location.reload(), 2000);
-        });
+        try {
+            Pusher.logToConsole = false;
+            pusher = new Pusher('{{ PUSHER_KEY }}', {
+                cluster: '{{ PUSHER_CLUSTER }}',
+                authEndpoint: '/pusher/auth',
+                auth: {
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                }
+            });
 
-        socket.on('assigned_as_helper', function(data) {
-            showToast(`You have been assigned as a helper for Ticket #${data.ticket_id} (Room ${data.ticket_number})!`, 'info');
-            setTimeout(() => location.reload(), 2000);
-        });
+            // Subscribe to unique professional channel
+            const professionalId = '{{ session.professional_id }}';
+            channel = pusher.subscribe(`private-professional-${professionalId}`);
+            
+            // Listen for new assignments
+            channel.bind('new_assignment', function(data) {
+                showToast(`New task assigned! Ticket #${data.ticket_id}`, 'info');
+                setTimeout(() => location.reload(), 2000);
+            });
+            
+            // Listen for help approvals
+            channel.bind('help_approved', function(data) {
+                showToast(`Help request approved! ${data.helper_name} will assist you.`, 'success');
+                setTimeout(() => location.reload(), 2000);
+            });
+            
+            // Listen for help rejections
+            channel.bind('help_rejected', function(data) {
+                showToast('Help request was rejected.', 'warning');
+                setTimeout(() => location.reload(), 2000);
+            });
+
+            // Listen for being assigned as a helper
+            channel.bind('assigned_as_helper', function(data) {
+                showToast(`You have been assigned as a helper for Ticket #${data.ticket_id} (Room ${data.ticket_number})!`, 'info');
+                setTimeout(() => location.reload(), 2000);
+            });
+            
+        } catch (e) {
+            console.error('Pusher init failed:', e);
+        }
     }
 
     // --- Web Push Subscription Logic ---
@@ -515,7 +534,10 @@
         
         fetch(`/professional/api/task/${ticketId}/complexity`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
             body: JSON.stringify({complexity: complexity})
         })
         .then(response => response.json())
@@ -534,7 +556,10 @@
         
         fetch(`/professional/api/task/${ticketId}/start`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'}
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
         })
         .then(async response => {
             const data = await response.json();
@@ -559,6 +584,9 @@
         
         fetch(`/professional/api/task/${ticketId}/complete`, {
             method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
             body: formData
         })
         .then(response => response.json())
@@ -589,7 +617,10 @@
         
         fetch(`/professional/api/task/${ticketId}/cancel`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
             body: JSON.stringify({reason: reason})
         })
         .then(async response => {
@@ -624,7 +655,10 @@
         
         fetch(`/professional/api/task/${ticketId}/request-help`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
             body: JSON.stringify({message: message})
         })
         .then(response => response.json())

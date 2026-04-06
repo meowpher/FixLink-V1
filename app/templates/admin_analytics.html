@@ -111,7 +111,7 @@
         <div class="col-lg-8">
             <div class="analytics-card p-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="mb-0 fw-bold">Registration Trend</h5>
+                    <h5 class="mb-0 fw-bold">Ticket Volume Trend</h5>
                     <span class="badge bg-primary-subtle text-primary py-2 px-3">Last 6 Months</span>
                 </div>
                 <div class="chart-container">
@@ -193,7 +193,7 @@
         new Chart(trendCtx, {
             type: 'line',
             data: {
-                labels: trendData.map(d => d.month),
+                labels: trendData.map(d => d[0]),
                 datasets: [{
                     label: 'Monthly Tickets',
                     data: trendData.map(d => d[1]),

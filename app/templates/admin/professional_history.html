@@ -1,86 +1,225 @@
 {% extends "base.html" %}
 
-{% block title %}Professional History - {{ professional.name }}{% endblock %}
+{% block extra_css %}
+<style>
+    .prof-header {
+        background: var(--bg-card);
+        border-radius: var(--border-radius-lg);
+        padding: 2rem;
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-md);
+        margin-bottom: 2rem;
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+    }
+
+    .prof-avatar-lg {
+        width: 100px;
+        height: 100px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, var(--mitwpu-blue) 0%, var(--mitwpu-blue-dark) 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        font-weight: 700;
+        box-shadow: 0 8px 16px rgba(11, 77, 140, 0.2);
+    }
+
+    .stats-card {
+        border: none;
+        border-radius: var(--border-radius-lg);
+        overflow: hidden;
+        transition: all 0.3s;
+        height: 100%;
+        color: white;
+        min-height: 140px;
+    }
+
+    .stats-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .stats-card.completed {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .stats-card.cancelled {
+        background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+    }
+
+    .stats-icon {
+        font-size: 2.5rem;
+        opacity: 0.3;
+        position: absolute;
+        right: 1.5rem;
+        bottom: 1rem;
+    }
+
+    .table-container {
+        background: var(--bg-card);
+        border-radius: var(--border-radius-lg);
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .section-header {
+        padding: 1.25rem 1.75rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .bg-icon-success {
+        color: #10b981;
+        background: rgba(16, 185, 129, 0.1);
+        padding: 8px;
+        border-radius: 8px;
+    }
+
+    .bg-icon-danger {
+        color: #f43f5e;
+        background: rgba(244, 63, 94, 0.1);
+        padding: 8px;
+        border-radius: 8px;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{{ url_for('admin.professionals') }}">Professionals</a></li>
-                    <li class="breadcrumb-item active">{{ professional.name }} History</li>
-                </ol>
-            </nav>
-            <h2>Job History: {{ professional.name }}</h2>
-            <span class="badge bg-info">{{ category_name }}</span>
+<div class="container-fluid mt-4 px-4 pb-5">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('admin.professionals') }}">Professionals</a></li>
+            <li class="breadcrumb-item active">{{ professional.name }} History</li>
+        </ol>
+    </nav>
+
+    <!-- Header Section -->
+    <div class="prof-header">
+        <div class="prof-avatar-lg">
+        {% set initials = professional.name.split(' ') | map('first') | join('') | truncate(2, True, '') | upper %}
+        {{ initials }}
         </div>
-        <a href="{{ url_for('admin.professionals') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Back to List
-        </a>
+        <div class="flex-grow-1">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h1 class="fw-bold mb-1">{{ professional.name }}</h1>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2 fw-semibold">
+                            <i class="bi bi-tools me-1"></i> {{ category_name }}
+                        </span>
+                        <span class="text-muted small">Professional Technician</span>
+                    </div>
+                </div>
+                <a href="{{ url_for('admin.professionals') }}" class="btn btn-outline-secondary rounded-pill px-4">
+                    <i class="bi bi-arrow-left me-1"></i> Back to List
+                </a>
+            </div>
+            <div class="mt-4 d-flex gap-4">
+                <div class="text-muted small">
+                    <i class="bi bi-calendar-check me-1"></i> Total Job History: <strong>{{ completed_jobs|length + cancelled_jobs|length }} Jobs</strong>
+                </div>
+                <div class="text-muted small">
+                    <i class="bi bi-award me-1"></i> Completion Rate: 
+                    <strong>{{ ((completed_jobs|length / (completed_jobs|length + cancelled_jobs|length or 1)) * 100)|round|int }}%</strong>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Stats Summary -->
-    <div class="row mb-4">
+    <!-- Stats Summary Cards -->
+    <div class="row g-4 mb-5">
         <div class="col-md-6">
-            <div class="card bg-success text-white">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Jobs Completed</h5>
-                    <h2 class="display-4">{{ completed_jobs|length }}</h2>
+            <div class="card stats-card completed p-4">
+                <div class="card-body p-0 d-flex flex-column justify-content-center">
+                    <h6 class="text-white-50 text-uppercase fw-bold mb-1">Jobs Completed Successfully</h6>
+                    <h2 class="display-3 fw-bold mb-0">{{ completed_jobs|length }}</h2>
+                    <i class="bi bi-check-circle-fill stats-icon"></i>
+                    <p class="mb-0 mt-2 text-white-50 small">Successful maintenance interventions</p>
                 </div>
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card bg-danger text-white">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Jobs Cancelled</h5>
-                    <h2 class="display-4">{{ cancelled_jobs|length }}</h2>
+            <div class="card stats-card cancelled p-4">
+                <div class="card-body p-0 d-flex flex-column justify-content-center">
+                    <h6 class="text-white-50 text-uppercase fw-bold mb-1">Jobs Cancelled / Failed</h6>
+                    <h2 class="display-3 fw-bold mb-0">{{ cancelled_jobs|length }}</h2>
+                    <i class="bi bi-x-circle-fill stats-icon"></i>
+                    <p class="mb-0 mt-2 text-white-50 small">Unresolved or rejected tickets</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Completed Jobs -->
-    <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-white py-3">
-            <h5 class="mb-0 text-success"><i class="bi bi-check-circle-fill me-2"></i>Completed Jobs</h5>
+    <!-- Completed Jobs Section -->
+    <div class="table-container mb-5 mt-2">
+        <div class="section-header">
+            <i class="bi bi-check-circle-fill bg-icon-success fs-5"></i>
+            <h5 class="mb-0 fw-bold">Completed Jobs</h5>
         </div>
-        <div class="card-body">
+        <div class="p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>ID</th>
-                            <th>Room</th>
-                            <th>Issue</th>
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr class="text-muted small text-uppercase">
+                            <th class="ps-4 py-3">Job ID</th>
+                            <th>Room / Location</th>
+                            <th>Issue Type</th>
                             <th>Completion Date</th>
-                            <th>Photo</th>
-                            <th>Actions</th>
+                            <th>Photo Evidence</th>
+                            <th class="ps-3 pe-4">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="border-top-0">
                         {% for job in completed_jobs %}
                         <tr>
-                            <td>#{{ job.id }}</td>
-                            <td>{{ job.room.number }}</td>
-                            <td>{{ job.issue_type|title }}</td>
-                            <td>{{ job.job_completed_at|ist('%Y-%m-%d %H:%M') }}</td>
+                            <td class="ps-4 fw-medium text-primary">#{{ job.id }}</td>
                             <td>
-                                {% if job.completion_photo_filename %}
-                                <img src="{{ url_for('static', filename='uploads/' + job.completion_photo_filename) }}" 
-                                     alt="Completion Photo" class="img-thumbnail" style="height: 50px; cursor: pointer;"
-                                     onclick="window.showPhoto('{{ url_for('static', filename='uploads/' + job.completion_photo_filename) }}')">
-                                {% else %}
-                                <span class="text-muted">No photo</span>
-                                {% endif %}
+                                <div class="fw-bold text-dark">{{ job.room.number }}</div>
+                                <div class="text-muted small">Academic Block</div>
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-outline-primary" onclick="viewTicket({{ job.id }})">Details</button>
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">
+                                    {{ job.issue_type|title }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="text-dark">{{ job.job_completed_at|ist('%d %b %Y') }}</div>
+                                <div class="text-muted small">{{ job.job_completed_at|ist('%I:%M %p') }}</div>
+                            </td>
+                            <td>
+                                {% if job.completion_photo_filename %}
+                                <div class="position-relative d-inline-block">
+                                    <img src="{{ url_for('static', filename='uploads/' + job.completion_photo_filename) }}" 
+                                         alt="Completion Photo" class="rounded border shadow-sm" style="height: 42px; width: 42px; object-fit: cover; cursor: pointer;"
+                                         onclick="window.showPhoto('{{ url_for('static', filename='uploads/' + job.completion_photo_filename) }}')">
+                                    <div class="position-absolute bottom-0 end-0 bg-white rounded-circle shadow-sm p-1" style="transform: translate(30%, 30%);">
+                                        <i class="bi bi-zoom-in text-primary" style="font-size: 0.6rem;"></i>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <span class="text-muted small italic">Not provided</span>
+                                {% endif %}
+                            </td>
+                            <td class="pe-4">
+                                <button class="btn btn-sm btn-light border rounded-pill px-3 fw-semibold text-primary" onclick="viewTicket({{ job.id }})">
+                                    View Details
+                                </button>
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">No completed jobs found.</td>
+                            <td colspan="6" class="text-center py-5 text-muted italic">
+                                <i class="bi bi-inbox fs-2 d-block mb-2 opacity-25"></i>
+                                No completed jobs found in the archives.
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -89,43 +228,59 @@
         </div>
     </div>
 
-    <!-- Cancelled Jobs -->
-    <div class="card shadow-sm">
-        <div class="card-header bg-white py-3">
-            <h5 class="mb-0 text-danger"><i class="bi bi-x-circle-fill me-2"></i>Cancelled Jobs</h5>
+    <!-- Cancelled Jobs Section -->
+    <div class="table-container">
+        <div class="section-header">
+            <i class="bi bi-x-circle-fill bg-icon-danger fs-5"></i>
+            <h5 class="mb-0 fw-bold">Cancelled Jobs</h5>
         </div>
-        <div class="card-body">
+        <div class="p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>ID</th>
-                            <th>Room</th>
-                            <th>Issue</th>
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr class="text-muted small text-uppercase">
+                            <th class="ps-4 py-3">Job ID</th>
+                            <th>Room / Location</th>
+                            <th>Issue Type</th>
                             <th>Cancellation Date</th>
-                            <th>Reason</th>
-                            <th>Actions</th>
+                            <th style="width: 30%;">Reason for Cancellation</th>
+                            <th class="ps-3 pe-4">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="border-top-0">
                         {% for job in cancelled_jobs %}
                         <tr>
-                            <td>#{{ job.id }}</td>
-                            <td>{{ job.room.number }}</td>
-                            <td>{{ job.issue_type|title }}</td>
-                            <td>{{ job.cancelled_at|ist('%Y-%m-%d %H:%M') }}</td>
+                            <td class="ps-4 fw-medium text-danger">#{{ job.id }}</td>
                             <td>
-                                <div class="text-truncate" style="max-width: 250px;" title="{{ job.cancellation_reason }}">
-                                    {{ job.cancellation_reason }}
-                                </div>
+                                <div class="fw-bold text-dark">{{ job.room.number }}</div>
+                                <div class="text-muted small">Academic Block</div>
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-outline-primary" onclick="viewTicket({{ job.id }})">Details</button>
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">
+                                    {{ job.issue_type|title }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="text-dark">{{ job.cancelled_at|ist('%d %b %Y') }}</div>
+                                <div class="text-muted small">{{ job.cancelled_at|ist('%I:%M %p') }}</div>
+                            </td>
+                            <td>
+                                <div class="text-dark small text-truncate" style="max-width: 280px;" title="{{ job.cancellation_reason }}">
+                                    "{{ job.cancellation_reason }}"
+                                </div>
+                            </td>
+                            <td class="pe-4">
+                                <button class="btn btn-sm btn-light border rounded-pill px-3 fw-semibold text-primary" onclick="viewTicket({{ job.id }})">
+                                    View Details
+                                </button>
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">No cancelled jobs found.</td>
+                            <td colspan="6" class="text-center py-5 text-muted italic">
+                                <i class="bi bi-slash-circle fs-2 d-block mb-2 opacity-25"></i>
+                                No cancelled jobs recorded for this technician.
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -192,38 +347,45 @@
             if (data.success) {
                 const t = data.ticket;
                 let html = `
-                    <div class="row">
+                    <div class="row g-3">
                         <div class="col-md-6">
-                            <p><strong>ID:</strong> #${t.id}</p>
-                            <p><strong>Status:</strong> <span class="badge bg-${getStatusColor(t.status)}">${t.status.toUpperCase()}</span></p>
-                            <p><strong>Room:</strong> ${t.room_number}</p>
-                            <p><strong>Reporter:</strong> ${t.reporter_name}</p>
-                            <p><strong>Issue:</strong> ${t.issue_type}</p>
+                            <div class="p-3 bg-light rounded border-start border-4 border-primary">
+                                <h6 class="text-primary fw-bold mb-3 small text-uppercase">General Information</h6>
+                                <p class="mb-2"><strong>ID:</strong> <span class="text-primary">#${t.id}</span></p>
+                                <p class="mb-2"><strong>Status:</strong> <span class="badge bg-${getStatusColor(t.status)}">${t.status.toUpperCase()}</span></p>
+                                <p class="mb-2"><strong>Room:</strong> ${t.room_number}</p>
+                                <p class="mb-2"><strong>Reporter:</strong> ${t.reporter_name}</p>
+                                <p class="mb-0"><strong>Issue:</strong> <span class="badge bg-secondary">${t.issue_type}</span></p>
+                            </div>
                         </div>
                         <div class="col-md-6">
-                            <p><strong>Created:</strong> ${new Date(t.created_at).toLocaleString()}</p>
-                            ${t.fixed_at ? `<p><strong>Fixed:</strong> ${new Date(t.fixed_at).toLocaleString()}</p>` : ''}
-                            ${t.cancelled_at ? `<p><strong>Cancelled:</strong> ${new Date(t.cancelled_at).toLocaleString()}</p>` : ''}
-                            ${t.cancellation_reason ? `<p class="text-danger"><strong>Reason:</strong> ${t.cancellation_reason}</p>` : ''}
+                            <div class="p-3 bg-light rounded border-start border-4 border-info">
+                                <h6 class="text-info fw-bold mb-3 small text-uppercase">Time & Resolution</h6>
+                                <p class="mb-2"><strong>Created:</strong> ${new Date(t.created_at).toLocaleString()}</p>
+                                ${t.fixed_at ? `<p class="mb-2"><strong>Fixed:</strong> ${new Date(t.fixed_at).toLocaleString()}</p>` : ''}
+                                ${t.cancelled_at ? `<p class="mb-2 text-danger"><strong>Cancelled:</strong> ${new Date(t.cancelled_at).toLocaleString()}</p>` : ''}
+                                ${t.cancellation_reason ? `<p class="mb-0 text-danger small"><strong>Reason:</strong> ${t.cancellation_reason}</p>` : ''}
+                            </div>
                         </div>
                     </div>
-                    <hr>
-                    <p><strong>Description:</strong></p>
-                    <p class="p-3 bg-light rounded">${t.description}</p>
+                    <div class="mt-4">
+                        <h6 class="fw-bold mb-2 small text-uppercase text-muted">Description</h6>
+                        <p class="p-3 bg-white border rounded shadow-sm mb-0">${t.description}</p>
+                    </div>
                 `;
                 
                 if (t.completion_photo_filename) {
                     html += `
-                        <div class="mt-3">
-                            <p><strong>Completion Photo:</strong></p>
-                            <img src="/static/uploads/${t.completion_photo_filename}" class="img-fluid rounded border shadow-sm">
+                        <div class="mt-4">
+                            <h6 class="fw-bold mb-2 small text-uppercase text-muted">Completion Evidence</h6>
+                            <img src="/static/uploads/${t.completion_photo_filename}" class="img-fluid rounded border shadow-lg w-100" style="max-height: 400px; object-fit: contain; background: #e2e8f0;">
                         </div>
                     `;
                 } else if (t.image_filename) {
                      html += `
-                        <div class="mt-3">
-                            <p><strong>Report Photo:</strong></p>
-                            <img src="/static/uploads/${t.image_filename}" class="img-fluid rounded border shadow-sm">
+                        <div class="mt-4">
+                            <h6 class="fw-bold mb-2 small text-uppercase text-muted">Initial Report Photo</h6>
+                            <img src="/static/uploads/${t.image_filename}" class="img-fluid rounded border shadow-lg w-100" style="max-height: 400px; object-fit: contain; background: #e2e8f0;">
                         </div>
                     `;
                 }

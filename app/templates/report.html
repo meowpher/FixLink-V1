@@ -138,12 +138,6 @@
                                 </select>
                             </div>
                             <div class="mb-3">
-                                <label for="asset_id" class="form-label">Related Asset (Optional)</label>
-                                <select class="form-select" id="asset_id" name="asset_id" disabled>
-                                    <option value="">Select Asset</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
                                 <label for="description" class="form-label">Description *</label>
                                 <textarea class="form-control" id="description" name="description" rows="3"
                                     placeholder="Describe the issue in detail..." required></textarea>
@@ -170,9 +164,34 @@
 {% block extra_js %}
 <script>
     // Pre-selected values from server (if room param was provided)
-    const preSelectedFloor = {{ selected_floor|default('null')|tojson|safe }};
-    const preSelectedRoom = {{ selected_room|default('null')|tojson|safe }};
-    const preSelectedRoomNumber = '{{ room_param|default('') }}';
+    const preSelectedFloor = {{ selected_floor|tojson|safe if selected_floor else 'null' }};
+    const preSelectedRoom = {{ selected_room|tojson|safe if selected_room else 'null' }};
+    const preSelectedRoomNumber = '{{ room_param|default("") }}';
+
+    // Success and Error Handlers
+    window.showSuccessModal = function(ticketId) {
+        const ticketIdEl = document.getElementById('successTicketId');
+        if (ticketIdEl) ticketIdEl.textContent = '#' + ticketId;
+        const modalEl = document.getElementById('successModal');
+        if (modalEl) {
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        }
+    };
+
+    window.closeSuccessModal = function() {
+        location.reload(); 
+    };
+
+    window.showErrors = function(errors) {
+        const errorAlert = document.getElementById('errorAlert');
+        const errorMessage = document.getElementById('errorMessage');
+        if (errorAlert && errorMessage) {
+            errorMessage.innerHTML = Array.isArray(errors) ? errors.join('<br>') : errors;
+            errorAlert.style.display = 'block';
+            errorAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    };
 </script>
 <script type="module" src="{{ url_for('static', filename='js/modules/main.js') }}"></script>
 {% endblock %}

@@ -98,7 +98,6 @@ def submit_report():
     reporter_email = user.email
 
     room_id = request.form.get('room_id')
-    asset_id = request.form.get('asset_id')
     issue_type = request.form.get('issue_type', '').strip()
     description = request.form.get('description', '').strip()
     
@@ -139,13 +138,6 @@ def submit_report():
             r_id = int(room_id)
         except (TypeError, ValueError):
             errors.append('Invalid Room ID')
-            
-        a_id = None
-        if asset_id:
-            try:
-                a_id = int(asset_id)
-            except (TypeError, ValueError):
-                errors.append('Invalid Asset ID')
         
         if errors:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -156,7 +148,7 @@ def submit_report():
 
         ticket = Ticket(
             room_id=r_id,
-            asset_id=a_id,
+            asset_id=None,
             issue_type=issue_type,
             description=description,
             image_filename=image_filename,
@@ -168,19 +160,12 @@ def submit_report():
         )
         
         db.session.add(ticket)
-        
-        # If asset specified, mark it as broken
-        if a_id:
-            asset = Asset.query.get(a_id)
-            if asset:
-                asset.status = Asset.STATUS_BROKEN
-        
         db.session.commit()
         
         # Invalidate map cache for this floor
         room_obj = Room.query.get(r_id)
         if room_obj:
-            from ...cache import invalidate_floor_cache
+            from app.cache import invalidate_floor_cache
             invalidate_floor_cache(room_obj.floor_id)
         
         # Trigger EmailJS notification for ticket creation

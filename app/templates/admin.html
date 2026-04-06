@@ -151,8 +151,6 @@
                                 <th>Issue</th>
                                 <th>Status</th>
                                 <th>Date</th>
-                                <th>Actions</th>
-                                <th class="text-center">Map</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -208,57 +206,10 @@
                                         {{ ticket.created_at.strftime('%d %b %Y') }}
                                     </small>
                                 </td>
-                                <td>
-                                    <div class="action-buttons">
-                                        {% if not ticket.assigned_professional_id and ticket.status in ['open', 'cancelled'] %}
-                                        <a href="{{ url_for('admin.assign_ticket', ticket_id=ticket.id) }}" class="btn btn-sm btn-dark" 
-                                           onclick="event.stopPropagation()"
-                                           title="Assign to Professional">
-                                            <i class="bi bi-person-plus"></i>
-                                        </a>
-                                        {% endif %}
-                                        {% if ticket.assigned_professional_id %}
-                                        <span class="btn btn-sm btn-outline-info" title="Assigned to: {{ ticket.assigned_professional.name }}">
-                                            <i class="bi bi-person-check"></i>
-                                        </span>
-                                        {% endif %}
-                                        {% if ticket.status in ['open', 'cancelled'] %}
-                                        <button class="btn btn-sm btn-warning" 
-                                                data-ticket-id="{{ ticket.id }}"
-                                                onclick="event.stopPropagation(); updateStatus(this.dataset.ticketId, 'in-progress')" 
-                                                title="Mark In Progress">
-                                            <i class="bi bi-arrow-repeat"></i>
-                                        </button>
-                                        {% endif %}
-                                        {% if ticket.status != 'fixed' %}
-                                        <button class="btn btn-sm btn-success" 
-                                                data-ticket-id="{{ ticket.id }}"
-                                                onclick="event.stopPropagation(); updateStatus(this.dataset.ticketId, 'fixed')" 
-                                                title="Mark Fixed">
-                                            <i class="bi bi-check-lg"></i>
-                                        </button>
-                                        {% endif %}
-                                        <button class="btn btn-sm btn-danger" 
-                                                data-ticket-id="{{ ticket.id }}"
-                                                onclick="event.stopPropagation(); deleteTicket(this.dataset.ticketId)" 
-                                                title="Delete Ticket">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                                <td class="text-center">
-                                    <a href="{{ url_for('admin.status_map', floor=ticket.room.floor_id, room=ticket.room.number) }}" 
-                                       onclick="event.stopPropagation()"
-                                       class="btn btn-primary d-inline-flex align-items-center justify-content-center shadow-sm" 
-                                       style="width: 38px; height: 38px; border-radius: 10px;"
-                                       title="View on Map">
-                                        <i class="bi bi-geo-alt-fill"></i>
-                                    </a>
-                                </td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="7" class="text-center py-5">
+                                <td colspan="5" class="text-center py-5">
                                     <i class="bi bi-inbox display-4 text-muted"></i>
                                     <p class="mt-3 text-muted">No tickets found matching your criteria</p>
                                 </td>
@@ -353,46 +304,67 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<!-- Pusher Integration -->
+<script src="https://js.pusher.com/8.0.1/pusher.min.js"></script>
 <script>
-    // Socket.IO Integration
-    let socket;
-    
+    let pusher;
+    let channel;
+
     document.addEventListener('DOMContentLoaded', function() {
-        initSocket();
+        initPusher();
     });
 
-    function initSocket() {
+    function initPusher() {
+        if (!'{{ PUSHER_KEY }}') {
+            console.warn('Pusher key missing from configuration.');
+            return;
+        }
+
         try {
-            socket = io();
+            Pusher.logToConsole = false;
+            pusher = new Pusher('{{ PUSHER_KEY }}', {
+                cluster: '{{ PUSHER_CLUSTER }}',
+                authEndpoint: '/pusher/auth',
+                auth: {
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                }
+            });
+
+            channel = pusher.subscribe('private-admins');
             
             // Listen for new tickets
-            socket.on('new_ticket', function(data) {
+            channel.bind('new_ticket', function(data) {
                 showToast(`New Report: Ticket #${data.ticket_id} in Room ${data.ticket_number}`, 'danger');
-                // Auto-refresh to show new ticket if it matches filters
                 setTimeout(() => location.reload(), 3000);
             });
             
             // Listen for job starts
-            socket.on('job_started', function(data) {
+            channel.bind('job_started', function(data) {
                 showToast(`Job Started: Technician ${data.professional_name} started Ticket #${data.ticket_id}`, 'warning');
                 setTimeout(() => location.reload(), 3000);
             });
             
             // Listen for job completions
-            socket.on('job_completed', function(data) {
+            channel.bind('job_completed', function(data) {
                 showToast(`Job Finished: Ticket #${data.ticket_id} marked as Fixed by ${data.professional_name}`, 'success');
                 setTimeout(() => location.reload(), 3000);
             });
             
             // Listen for job cancellations
-            socket.on('job_cancelled', function(data) {
+            channel.bind('job_cancelled', function(data) {
                 showToast(`JOB CANCELLED: Ticket #${data.ticket_id} was cancelled by ${data.professional_name}`, 'danger');
                 setTimeout(() => location.reload(), 3000);
             });
+
+            // Listen for help requests
+            channel.bind('help_requested', function(data) {
+                showToast(`Help Requested: ${data.requester_name} needs help for room ${data.ticket_number}`, 'warning');
+            });
             
         } catch (e) {
-            console.error('Socket init failed:', e);
+            console.error('Pusher init failed:', e);
         }
     }
 
@@ -436,6 +408,7 @@
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             },
             body: JSON.stringify({ status: newStatus })
         })
@@ -464,6 +437,7 @@
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             }
         })
         .then(response => response.json())
@@ -557,6 +531,30 @@
                         <p class="ticket-description">${ticket.description}</p>
                     </div>
                     ${imageHtml}
+
+                    <div class="modal-actions-container mt-4 pt-4 border-top">
+                        <div class="d-flex flex-wrap gap-2 justify-content-center">
+                            ${(!ticket.assigned_professional_id && ['open', 'cancelled'].includes(ticket.status)) ? `
+                                <a href="/admin/ticket/${ticket.id}/assign" class="btn btn-dark px-3 py-2 rounded-3 shadow-sm border-0 transition-all">
+                                    <i class="bi bi-person-plus-fill me-2"></i>Assign Technician
+                                </a>
+                            ` : ''}
+                            
+                            ${(ticket.status !== 'fixed') ? `
+                                <button onclick="updateStatus(${ticket.id}, 'fixed')" class="btn btn-success px-3 py-2 rounded-3 shadow-sm border-0 transition-all">
+                                    <i class="bi bi-check-lg me-2"></i>Mark Resolved
+                                </button>
+                            ` : ''}
+                            
+                            <a href="/admin/map?floor=${ticket.room_floor_id}&room=${ticket.room_number}" class="btn btn-primary px-3 py-2 rounded-3 shadow-sm border-0 transition-all">
+                                <i class="bi bi-geo-alt-fill me-2"></i>View in Map
+                            </a>
+                            
+                            <button onclick="deleteTicket(${ticket.id})" class="btn btn-danger px-3 py-2 rounded-3 shadow-sm border-0 transition-all">
+                                <i class="bi bi-trash-fill me-2"></i>Delete
+                            </button>
+                        </div>
+                    </div>
                 `;
                 
                 const modal = new bootstrap.Modal(document.getElementById('ticketModal'));

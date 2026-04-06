@@ -19,9 +19,8 @@ export async function initializeAdminMap(floorId) {
         const result = await response.json();
 
         if (result.success) {
-            const data = result.data;
             container.innerHTML = '';
-            renderFloorMap(container, data.rooms, data.floor.level.toString(), true);
+            renderFloorMap(container, result.rooms, result.floor.level.toString(), true);
             
             // Override selectRoom for admin view
             window.selectRoom = (roomNumber, roomId, roomName) => {
@@ -69,7 +68,7 @@ export function showRoomDetails(roomNumber, roomId) {
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                renderRoomDetails(panelBody, data.data);
+                renderRoomDetails(panelBody, data);
             } else {
                 panelBody.innerHTML = `<div class="alert alert-danger m-3 x-small">Error: ${data.error}</div>`;
             }
@@ -203,7 +202,10 @@ export async function assignTechnician(ticketId) {
     try {
         const response = await fetch(`/admin/api/ticket/${ticketId}/assign`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
             body: JSON.stringify({ professional_id: profId, time_limit_hours: hours })
         });
         const result = await response.json();
@@ -220,7 +222,10 @@ export async function completeTicket(ticketId) {
     try {
         const response = await fetch(`/admin/tickets/${ticketId}/status`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
             body: JSON.stringify({ status: 'fixed' })
         });
         const result = await response.json();
@@ -233,7 +238,10 @@ export async function deleteTicketFromMap(ticketId) {
     try {
         const response = await fetch(`/admin/tickets/${ticketId}/delete`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
         });
         const result = await response.json();
         if (result.success) location.reload();

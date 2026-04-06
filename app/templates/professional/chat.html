@@ -222,31 +222,73 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<!-- Pusher Integration -->
+<script src="https://js.pusher.com/8.0.1/pusher.min.js"></script>
 <script>
-    let socket;
+    let pusher;
+    let channel;
     const professionalId = {{ professional.id }};
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialize Socket.IO
-        socket = io();
-        
-        socket.on('connect', () => {
-            console.log('Connected to WebSocket');
-        });
-
-        socket.on('new_chat_message', function(data) {
-            // Check if message is relevant (from admin to me, or from me to admin)
-            const isFromAdminToMe = data.sender_type === 'admin' && data.receiver_id === professionalId;
-            const isFromMeToAdmin = data.sender_type === 'professional' && data.sender_id === professionalId;
-            
-            if (isFromAdminToMe || isFromMeToAdmin) {
-                addMessageToChat(data);
-            }
-        });
-
+        initPusher();
         loadChatHistory();
     });
+
+    function initPusher() {
+        if (!'{{ PUSHER_KEY }}') {
+            console.warn('Pusher key missing from configuration.');
+            return;
+        }
+
+        try {
+            Pusher.logToConsole = false;
+            pusher = new Pusher('{{ PUSHER_KEY }}', {
+                cluster: '{{ PUSHER_CLUSTER }}',
+                authEndpoint: '/pusher/auth',
+                auth: {
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                }
+            });
+
+            channel = pusher.subscribe(`private-professional-${professionalId}`);
+            
+            channel.bind('new_chat_message', function(data) {
+                console.log('Received chat message:', data);
+                
+                // 1. Deduplication by ID (if fetch.then already ran)
+                if (document.querySelector(`[data-id="${data.id}"]`)) {
+                    console.log('Duplicate message ignored (ID exists):', data.id);
+                    return;
+                }
+
+                // 2. Deduplication by Pending State (if Pusher event arrives before fetch.then)
+                if (data.sender_type === 'professional' && data.sender_id == professionalId) {
+                    const pendingMsg = document.querySelector('.message.sent[data-is-pending="true"]');
+                    if (pendingMsg && pendingMsg.querySelector('.message-content').innerText.trim() === data.message.trim()) {
+                        console.log('Syncing pending message with real data');
+                        pendingMsg.dataset.id = data.id;
+                        pendingMsg.dataset.isPending = 'false';
+                        pendingMsg.classList.remove('opacity-50');
+                        return;
+                    }
+                }
+
+                // Check if message is relevant (from admin to me, or from me to admin)
+                const isFromAdminToMe = data.sender_type === 'admin' && data.receiver_id === professionalId;
+                const isFromMeToAdmin = data.sender_type === 'professional' && data.sender_id === professionalId;
+                
+                if (isFromAdminToMe || isFromMeToAdmin) {
+                    addMessageToChat(data);
+                    scrollToBottom();
+                }
+            });
+            
+        } catch (e) {
+            console.error('Pusher init failed:', e);
+        }
+    }
 
     function loadChatHistory() {
         const container = document.getElementById('chat-messages');
@@ -281,27 +323,49 @@
         const message = input.value.trim();
         if (!message) return;
 
-        // Disable input while sending
-        input.disabled = true;
+        // Optimistic UI Update: Add message immediately
+        const tempId = 'temp_' + Date.now();
+        const optimisticMsg = {
+            id: tempId,
+            message: message,
+            sender_type: 'professional',
+            timestamp: new Date().toISOString(),
+            is_pending: true
+        };
+        addMessageToChat(optimisticMsg);
+        scrollToBottom();
+
+        input.value = '';
+        input.focus();
 
         fetch('/professional/api/chat/send', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
             body: JSON.stringify({message: message})
         })
         .then(response => response.json())
         .then(data => {
-            input.disabled = false;
             if (data.success) {
-                input.value = '';
-                input.focus();
-                // We don't manually add the message here because Socket.IO will broadcast it back
+                // Replace temp message with server message if needed, or just remove pending state
+                const msgEl = document.querySelector(`[data-id="${tempId}"]`);
+                if (msgEl) {
+                    msgEl.dataset.id = data.chat_message.id;
+                    msgEl.dataset.isPending = 'false';
+                    msgEl.classList.remove('opacity-50');
+                }
             } else {
+                // Revert optimistic update on failure
+                const msgEl = document.querySelector(`[data-id="${tempId}"]`);
+                if (msgEl) msgEl.remove();
                 alert('Failed to send message: ' + (data.error || 'Unknown error'));
             }
         })
         .catch(err => {
-            input.disabled = false;
+            const msgEl = document.querySelector(`[data-id="${tempId}"]`);
+            if (msgEl) msgEl.remove();
             alert('Network error. Please try again.');
         });
     }
@@ -316,7 +380,9 @@
         const isMe = data.sender_type === 'professional';
         
         const div = document.createElement('div');
-        div.className = `message ${isMe ? 'sent' : 'received'}`;
+        div.dataset.id = data.id;
+        div.dataset.isPending = data.is_pending ? 'true' : 'false';
+        div.className = `message ${isMe ? 'sent' : 'received'} ${data.is_pending ? 'opacity-50' : ''}`;
         
         // Handle UTC ISO strings by ensuring they are treated as UTC
         const timestampStr = data.timestamp.endsWith('Z') ? data.timestamp : data.timestamp + 'Z';
@@ -341,7 +407,10 @@
         if (!confirm('Are you sure you want to clear your chat history with admins? This cannot be undone.')) return;
         
         fetch('/professional/api/chat/reset', {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
         })
         .then(response => response.json())
         .then(data => {

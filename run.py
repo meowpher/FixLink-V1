@@ -9,9 +9,6 @@ from app import create_app
 app = create_app()
 
 if __name__ == '__main__':
-    # Import socketio here to get the initialized instance from app module
-    from app import socketio
-    
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
     print("=" * 60)
@@ -22,8 +19,4 @@ if __name__ == '__main__':
     print(f"Admin Dashboard: http://localhost:{port}/admin")
     print("=" * 60)
     
-    if socketio:
-        socketio.run(app, host='0.0.0.0', port=port, debug=debug, allow_unsafe_werkzeug=True)
-    else:
-        print("Error: SocketIO instance not found. Starting without SocketIO...")
-        app.run(host='0.0.0.0', port=port, debug=debug)
+    app.run(host='0.0.0.0', port=port, debug=debug)

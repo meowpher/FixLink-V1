@@ -18,7 +18,7 @@ def mock_external_services():
 def app():
     """Create and configure a new app instance for each test using in-memory SQLite."""
     # Override config for testing
-    app = create_app()
+    app = create_app('testing')
     app.config.update({
         "TESTING": True,
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",

@@ -140,7 +140,8 @@ def history():
     per_page = 15
     
     # Base query for all fixed tickets
-    query = Ticket.query.filter_by(status=Ticket.STATUS_FIXED)
+    from sqlalchemy.orm import joinedload
+    query = Ticket.query.options(joinedload(Ticket.room).joinedload(Room.floor)).filter_by(status=Ticket.STATUS_FIXED)
     
     if search_query:
         search_filter = f"%{search_query}%"
@@ -288,7 +289,10 @@ def edit_user(user_id):
         user.set_password(password)
         
     db.session.commit()
-    return api_response(message="User updated successfully")
+    return jsonify({
+        'success': True,
+        'message': "User updated successfully"
+    })
 
 
 @admin_bp.route('/users/<int:user_id>/delete', methods=['POST'])
@@ -302,7 +306,10 @@ def delete_user(user_id):
     user = User.query.get_or_404(user_id)
     db.session.delete(user)
     db.session.commit()
-    return api_response(message="User deleted successfully")
+    return jsonify({
+        'success': True,
+        'message': "User deleted successfully"
+    })
 
 
 @admin_bp.route('/users/<int:user_id>/verify', methods=['POST'])
@@ -314,7 +321,10 @@ def verify_user_manual(user_id):
     user.is_verified = True
     user.verification_token = None
     db.session.commit()
-    return api_response(message="User verified successfully")
+    return jsonify({
+        'success': True,
+        'message': "User verified successfully"
+    })
 
 
 @admin_bp.route('/tickets/<int:ticket_id>/update-status', methods=['POST'])
@@ -352,13 +362,12 @@ def update_ticket_status(ticket_id):
     # Trigger EmailJS notification for ticket update
     send_ticket_email(ticket, action=new_status)
     
-    return api_response(
-        data={
-            'ticket_id': ticket.id,
-            'status': ticket.status
-        },
-        message=f"Ticket #{ticket.id} marked as {new_status}"
-    )
+    return jsonify({
+        'success': True,
+        'message': f"Ticket #{ticket.id} marked as {new_status}",
+        'ticket_id': ticket.id,
+        'status': ticket.status
+    })
 
 
 @admin_bp.route('/ticket/<int:ticket_id>')
@@ -367,7 +376,7 @@ def update_ticket_status(ticket_id):
 def get_ticket_detail(ticket_id):
     """Get ticket details for modal (AJAX)."""
     ticket = Ticket.query.get_or_404(ticket_id)
-    return api_response(data={'ticket': ticket.to_dict()})
+    return jsonify({'success': True, 'ticket': ticket.to_dict()})
 
 
 @admin_bp.route('/floor-data/<int:floor_id>')
@@ -380,7 +389,10 @@ def get_floor_data(floor_id):
     cache_key = f'admin_floor_{floor_id}'
     cached = cache.get(cache_key)
     if cached:
-        return api_response(data=cached)
+        return jsonify({
+            'success': True,
+            **cached
+        })
     
     floor = Floor.query.get_or_404(floor_id)
     
@@ -396,7 +408,10 @@ def get_floor_data(floor_id):
     }
     
     cache.set(cache_key, result, timeout=3600)  # 60 minutes
-    return api_response(data=result)
+    return jsonify({
+        'success': True,
+        **result
+    })
 
 
 @admin_bp.route('/api/room-status/<room_number>')
@@ -404,7 +419,7 @@ def get_floor_data(floor_id):
 @handle_api_errors
 def api_room_status(room_number):
     """Detailed room status for the interactive map (AJAX)."""
-    room = Room.query.filter_by(number=room_number.upper()).first_or_404()
+    room = Room.query.filter(Room.number.ilike(room_number)).first_or_404()
     
     # Get active ticket (open, assigned, or in-progress)
     active_ticket = Ticket.query.filter(
@@ -432,7 +447,8 @@ def api_room_status(room_number):
             'name': p.name
         })
     
-    return api_response(data={
+    return jsonify({
+        'success': True,
         'room': room.to_dict(),
         'status': room.status,
         'active_ticket': active_ticket.to_dict() if active_ticket else None,
@@ -481,7 +497,10 @@ def api_assign_ticket(ticket_id):
     if ticket.room_id:
         invalidate_floor_cache(ticket.room.floor_id)
         
-    return api_response(message="Technician assigned successfully")
+    return jsonify({
+        'success': True,
+        'message': "Technician assigned successfully"
+    })
 
 
 @admin_bp.route('/tickets/<int:ticket_id>/delete', methods=['POST'])
@@ -501,7 +520,10 @@ def delete_ticket(ticket_id):
     db.session.delete(ticket)
     db.session.commit()
     
-    return api_response(message=f"Ticket #{ticket.id} deleted successfully")
+    return jsonify({
+        'success': True,
+        'message': f"Ticket #{ticket.id} deleted successfully"
+    })
 
 
 # ==================== PROFESSIONAL MANAGEMENT ====================
@@ -662,7 +684,10 @@ def edit_professional(professional_id):
     email = data.get('email', '').strip().lower()
     if email != professional.email:
         if Professional.query.filter_by(email=email).first():
-            return api_response(success=False, error="Email already registered.", status=400)
+            return jsonify({
+                'success': False,
+                'error': "Email already registered."
+            }), 400
     
     professional.name = data.get('name', '').strip()
     professional.email = email
@@ -679,7 +704,10 @@ def edit_professional(professional_id):
         professional.set_password(password)
     
     db.session.commit()
-    return api_response(message="Professional updated successfully")
+    return jsonify({
+        'success': True,
+        'message': "Professional updated successfully"
+    })
 
 
 @admin_bp.route('/professionals/<int:professional_id>/delete', methods=['POST'])
@@ -704,7 +732,10 @@ def delete_professional(professional_id):
     
     db.session.delete(professional)
     db.session.commit()
-    return api_response(message="Professional deleted successfully")
+    return jsonify({
+        'success': True,
+        'message': "Professional deleted successfully"
+    })
 
 
 # ==================== TICKET ASSIGNMENT ====================
@@ -749,7 +780,7 @@ def assign_ticket(ticket_id):
             ticket.status = Ticket.STATUS_ASSIGNED
             db.session.commit()
             
-            from ...socket_events import notify_professional_assigned
+            from ...realtime import notify_professional_assigned
             notify_professional_assigned(ticket, professional)
             
             flash(f'Ticket #{ticket_id} assigned to {professional.name}!', 'success')
@@ -836,24 +867,33 @@ def respond_to_help_request(help_request_id):
     helper_professional_id = data.get('helper_professional_id')
     
     if action not in ['approve', 'reject']:
-        return api_response(success=False, error="Invalid action", status=400)
+        return jsonify({
+            'success': False,
+            'error': "Invalid action"
+        }), 400
     
     if action == 'approve' and not helper_professional_id:
-        return api_response(success=False, error="Helper professional required for approval", status=400)
+        return jsonify({
+            'success': False,
+            'error': "Helper professional required for approval"
+        }), 400
     
     admin = User.query.get(session['user_id'])
     
     if action == 'approve':
         helper = Professional.query.get(helper_professional_id)
         if not helper or not helper.is_active:
-            return api_response(success=False, error="Helper professional not available", status=400)
+            return jsonify({
+                'success': False,
+                'error': "Helper professional not available"
+            }), 400
         
         help_request.status = HelpRequest.STATUS_APPROVED
         help_request.helper_professional_id = helper_professional_id
         help_request.admin_id = admin.id
         help_request.responded_at = datetime.utcnow()
         
-        from ...socket_events import notify_help_request_approved
+        from ...realtime import notify_help_request_approved
         notify_help_request_approved(help_request)
         
     else:
@@ -861,11 +901,14 @@ def respond_to_help_request(help_request_id):
         help_request.admin_id = admin.id
         help_request.responded_at = datetime.utcnow()
         
-        from ...socket_events import notify_help_request_rejected
+        from ...realtime import notify_help_request_rejected
         notify_help_request_rejected(help_request)
     
     db.session.commit()
-    return api_response(message=f"Help request {action}d successfully")
+    return jsonify({
+        'success': True,
+        'message': f"Help request {action}d successfully"
+    })
 
 
 # ==================== ANALYTICS & REPORTS ====================
@@ -999,7 +1042,10 @@ def get_professionals_for_chat():
             'unread_count': unread_count
         })
     
-    return api_response(data={'professionals': result})
+    return jsonify({
+        'success': True,
+        'professionals': result
+    })
 
 
 @admin_bp.route('/api/chat/history/<int:professional_id>')
@@ -1028,7 +1074,8 @@ def get_chat_history_with_professional(professional_id):
             msg.is_read = True
     db.session.commit()
     
-    return api_response(data={
+    return jsonify({
+        'success': True,
         'messages': [msg.to_dict() for msg in messages],
         'professional': professional.to_dict()
     })
@@ -1063,10 +1110,14 @@ def admin_send_chat_message():
     db.session.add(chat_message)
     db.session.commit()
     
-    from ...socket_events import emit_chat_message
+    from ...realtime import emit_chat_message
     emit_chat_message(chat_message)
     
-    return api_response(data={'message': chat_message.to_dict()})
+    return jsonify({
+        'success': True,
+        'message': 'Message sent successfully',
+        'chat_message': chat_message.to_dict()
+    })
 
 
 @admin_bp.route('/api/chat/reset/<int:prof_id>', methods=['POST'])
@@ -1080,4 +1131,7 @@ def reset_professional_chat(prof_id):
         ((ChatMessage.receiver_type == ChatMessage.SENDER_TYPE_PROFESSIONAL) & (ChatMessage.receiver_id == prof_id))
     ).delete(synchronize_session=False)
     db.session.commit()
-    return api_response(message="Chat history reset successfully")
+    return jsonify({
+        'success': True,
+        'message': "Chat history reset successfully"
+    })

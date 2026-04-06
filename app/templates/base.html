@@ -14,6 +14,7 @@
 
     <!-- Custom CSS -->
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     {% block extra_css %}{% endblock %}
 </head>
@@ -69,7 +70,7 @@
                                 <li><a class="dropdown-item" href="{{ url_for('admin.help_requests') }}"><i class="bi bi-hand-thumbs-up me-2"></i>Help Requests</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ url_for('admin.history') }}"><i class="bi bi-clock-history me-2"></i>Full History</a></li>
-                                {% if session.get('is_super_admin') or (SUPER_ADMIN_EMAIL and session.get('profile_email') == SUPER_ADMIN_EMAIL) or (session.get('user_name') == 'Admin' and session.get('is_admin')) %}
+                                {% if session.get('is_super_admin') or (SUPER_ADMIN_EMAIL and session.get('user_email') == SUPER_ADMIN_EMAIL) or (session.get('user_name') == 'Admin' and session.get('is_admin')) %}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item text-primary fw-bold" href="{{ url_for('superadmin.login') }}"><i class="bi bi-code-square me-2"></i>Developer Dashboard</a></li>
                                 {% endif %}

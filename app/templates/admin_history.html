@@ -77,13 +77,12 @@
                             <th>Room</th>
                             <th>Issue</th>
                             <th>Status</th>
-                            <th>Fixed Date</th>
-                            <th>Actions</th>
+                            <th class="text-end">Fixed Date</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for ticket in tickets %}
-                        <tr data-ticket-id="{{ ticket.id }}">
+                        <tr data-ticket-id="{{ ticket.id }}" class="clickable-row" onclick="viewTicket(this.dataset.ticketId)">
                             <td>
                                 <span class="ticket-id">#{{ ticket.id }}</span>
                             </td>
@@ -112,7 +111,7 @@
                                     {{ ticket.status|title }}
                                 </span>
                             </td>
-                            <td>
+                            <td class="text-end">
                                 <small class="text-muted">
                                     {% if ticket.fixed_at %}
                                         {{ ticket.fixed_at.strftime('%d %b %Y') }}
@@ -121,35 +120,24 @@
                                     {% endif %}
                                 </small>
                             </td>
-                            <td>
-                                <div class="action-buttons">
-                                    <button class="btn btn-sm btn-info" onclick="viewTicket({{ ticket.id }})" 
-                                            title="View Details">
-                                        <i class="bi bi-eye"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-danger ms-1" onclick="deleteTicket({{ ticket.id }})" 
-                                            title="Delete Ticket">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
+                            {# Removed Actions Column #}
                         </tr>
                         {% else %}
-                        <tr id="no-results-row" style="display: none;">
-                            <td colspan="7" class="text-center py-5">
-                                <i class="bi bi-search display-4 text-muted"></i>
-                                <p class="mt-3 text-muted">No fixed tickets found matching your search.</p>
-                            </td>
-                        </tr>
-                        {% if not tickets %}
                         <tr>
-                            <td colspan="7" class="text-center py-5">
+                            <td colspan="6" class="text-center py-5">
                                 <i class="bi bi-inbox display-4 text-muted"></i>
                                 <p class="mt-3 text-muted">No fixed tickets in history yet.</p>
                             </td>
                         </tr>
-                        {% endif %}
                         {% endfor %}
+                        
+                        {# Search result placeholder, shown by JS #}
+                        <tr id="no-results-row" style="display: none;">
+                            <td colspan="6" class="text-center py-5">
+                                <i class="bi bi-search display-4 text-muted"></i>
+                                <p class="mt-3 text-muted">No fixed tickets found matching your search.</p>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -284,6 +272,17 @@
                             ${imageHtml}
                         </div>
                     </div>
+                    
+                    <div class="modal-actions-container mt-4 pt-4 border-top">
+                        <div class="d-flex flex-wrap gap-2 justify-content-center">
+                            <a href="/admin/map?floor=${ticket.room_floor_id}&room=${ticket.room_number}" class="btn btn-primary px-3 py-2 rounded-3 shadow-sm border-0 transition-all">
+                                <i class="bi bi-geo-alt-fill me-2"></i>View in Map
+                            </a>
+                            <button onclick="deleteTicket(${ticket.id})" class="btn btn-danger px-3 py-2 rounded-3 shadow-sm border-0 transition-all">
+                                <i class="bi bi-trash-fill me-2"></i>Delete Forever
+                            </button>
+                        </div>
+                    </div>
                 `;
                 
                 const bsModal = new bootstrap.Modal(document.getElementById('ticketModal'));
@@ -298,6 +297,35 @@
         });
     }
 
+    // Update ticket status via AJAX
+    function updateStatus(ticketId, newStatus) {
+        if (!confirm(`Are you sure you want to mark this ticket as ${newStatus}?`)) {
+            return;
+        }
+
+        fetch(`/admin/tickets/${ticketId}/update-status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to update status'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while updating the status');
+        });
+    }
+
     // Delete ticket functionality
     function deleteTicket(ticketId) {
         if (!confirm('Are you sure you want to delete this ticket? This action cannot be undone.')) {
@@ -308,6 +336,7 @@
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             }
         })
         .then(response => response.json())

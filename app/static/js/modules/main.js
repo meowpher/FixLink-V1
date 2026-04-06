@@ -66,7 +66,10 @@ function initializeReportForm() {
             const response = await fetch(reportForm.action, {
                 method: 'POST',
                 body: formData,
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                headers: { 
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
             });
 
             const data = await response.json();

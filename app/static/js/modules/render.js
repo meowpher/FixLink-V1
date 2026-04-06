@@ -43,6 +43,7 @@ export function renderGroundFloor(container, rooms, isAdmin = false) {
         const type = typeOverride || (room ? room.room_type : 'unknown');
         const isIssue = room && room.status === 'issue';
         const isInProgress = room && room.status === 'in-progress';
+        const isAssigned = room && room.status === 'assigned';
         const roomName = (room ? (room.name || roomNum) : roomNum).replace(/'/g, "\\'");
 
         let className = 'room-poly';
@@ -53,14 +54,17 @@ export function renderGroundFloor(container, rooms, isAdmin = false) {
         else if (type === 'lift') className += ' fill-pink';
         else if (type === 'management') className += ' fill-silver';
 
-        if (isIssue) className += ' has-issue';
-        else if (isInProgress) className += ' in-progress';
+        if (isAdmin) {
+            if (isIssue) className += ' has-issue';
+            else if (isInProgress) className += ' in-progress';
+            else if (isAssigned) className += ' assigned';
+        }
 
         const attrs = room ?
             `data-room="${roomNum}" data-room-id="${roomId}" onclick="selectRoom('${roomNum}', ${roomId}, '${roomName}', '${type}')"` :
             'class="room-disabled"';
 
-        let circleHtml = isAdmin ? renderAdminIndicators(x, y, w, isIssue, isInProgress) : '';
+        let circleHtml = isAdmin ? renderAdminIndicators(x, y, w, isIssue, isInProgress, isAssigned) : '';
 
         return `
             <g class="room-group" ${attrs}>
@@ -102,6 +106,7 @@ export function renderDetailedLayout(container, rooms, floorLevel, isAdmin = fal
         const type = typeOverride || (room ? room.room_type : 'unknown');
         const isIssue = room && room.status === 'issue';
         const isInProgress = room && room.status === 'in-progress';
+        const isAssigned = room && room.status === 'assigned';
         const roomName = (room ? (room.name || roomNum) : roomNum).replace(/'/g, "\\'");
 
         let className = 'room-poly';
@@ -111,14 +116,17 @@ export function renderDetailedLayout(container, rooms, floorLevel, isAdmin = fal
         else if (type === 'faculty') className += ' fill-orange';
         else if (type === 'lift') className += ' fill-pink';
 
-        if (isIssue) className += ' has-issue';
-        else if (isInProgress) className += ' in-progress';
+        if (isAdmin) {
+            if (isIssue) className += ' has-issue';
+            else if (isInProgress) className += ' in-progress';
+            else if (isAssigned) className += ' assigned';
+        }
 
         const attrs = room ?
             `data-room="${roomNum}" data-room-id="${roomId}" onclick="selectRoom('${roomNum}', ${roomId}, '${roomName}', '${type}')"` :
             'class="room-disabled"';
 
-        let circleHtml = isAdmin ? renderAdminIndicators(x, y, w, isIssue, isInProgress) : '';
+        let circleHtml = isAdmin ? renderAdminIndicators(x, y, w, isIssue, isInProgress, isAssigned) : '';
 
         return `
             <g class="room-group" ${attrs}>
@@ -156,8 +164,11 @@ export function renderGenericFloor(container, rooms, isAdmin = false) {
         else if (room.room_type === 'lab') roomClass += ' lab';
         else if (room.room_type === 'washroom') roomClass += ' washroom';
 
-        if (room.status === 'issue') roomClass += ' has-issue';
-        else if (room.status === 'in-progress') roomClass += ' in-progress';
+        if (isAdmin) {
+            if (room.status === 'issue') roomClass += ' has-issue';
+            else if (room.status === 'in-progress') roomClass += ' in-progress';
+            else if (room.status === 'assigned') roomClass += ' assigned';
+        }
 
         const roomName = (room.name || room.number).replace(/'/g, "\\'");
         
@@ -165,7 +176,8 @@ export function renderGenericFloor(container, rooms, isAdmin = false) {
         if (isAdmin) {
             const isIssue = room.status === 'issue';
             const isInProgress = room.status === 'in-progress';
-            const color = isIssue ? '#dc3545' : (isInProgress ? '#ffc107' : '#28a745');
+            const isAssigned = room.status === 'assigned';
+            const color = isIssue ? '#dc3545' : (isInProgress ? '#ffc107' : (isAssigned ? '#0d6efd' : '#28a745'));
             indicatorHtml = `<span class="admin-indicator" style="background-color: ${color}; width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 5px; border: 1px solid white;"></span>`;
         }
 
@@ -187,12 +199,12 @@ export function renderGenericFloor(container, rooms, isAdmin = false) {
 
 // Helpers
 
-function renderAdminIndicators(x, y, w, isIssue, isInProgress) {
+function renderAdminIndicators(x, y, w, isIssue, isInProgress, isAssigned) {
     const radius = 6;
     const padding = 4;
     const cx = x + w - radius - padding;
     const cy = y + radius + padding;
-    let circleFill = isIssue ? '#dc3545' : (isInProgress ? '#ffc107' : '#28a745');
+    let circleFill = isIssue ? '#dc3545' : (isInProgress ? '#ffc107' : (isAssigned ? '#0d6efd' : '#28a745'));
     return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${circleFill}" stroke="white" stroke-width="1.5" />`;
 }
 

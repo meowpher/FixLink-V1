@@ -159,19 +159,27 @@ class Room(db.Model):
     def has_broken_assets(self):
         """Check if room has any broken assets using efficient DB query."""
         return Asset.query.filter_by(room_id=self.id, status=Asset.STATUS_BROKEN).first() is not None
-        
+
+    @property
+    def has_assigned_tickets(self):
+        """Check if room has any ASSIGNED tickets (Blue status) using efficient DB query."""
+        return Ticket.query.filter_by(room_id=self.id, status=Ticket.STATUS_ASSIGNED).first() is not None
+    
     @property
     def status(self):
         """
         Return room status:
         - 'issue': Has OPEN tickets (Red)
-        - 'in-progress': Has IN_PROGRESS tickets but NO open tickets (Yellow)
-        - 'normal': No open or in-progress tickets (Green)
+        - 'in-progress': Has IN_PROGRESS tickets (Yellow)
+        - 'assigned': Has ASSIGNED tickets but NO open/in-progress (Blue)
+        - 'normal': No open, in-progress or assigned tickets (Green)
         """
         if self.has_open_tickets or self.has_broken_assets:
             return 'issue'
         elif self.has_in_progress_tickets:
             return 'in-progress'
+        elif self.has_assigned_tickets:
+            return 'assigned'
         return 'normal'
 
     def compute_status_from_loaded(self):
@@ -182,11 +190,14 @@ class Room(db.Model):
         has_open = any(t.status == Ticket.STATUS_OPEN for t in self.tickets)
         has_broken = any(a.status == Asset.STATUS_BROKEN for a in self.assets)
         has_in_progress = any(t.status == Ticket.STATUS_IN_PROGRESS for t in self.tickets)
+        has_assigned = any(t.status == Ticket.STATUS_ASSIGNED for t in self.tickets)
         
         if has_open or has_broken:
             return 'issue', has_open, has_broken
         elif has_in_progress:
             return 'in-progress', has_open, has_broken
+        elif has_assigned:
+            return 'assigned', has_open, has_broken
         return 'normal', has_open, has_broken
 
     def to_map_dict(self):
@@ -347,6 +358,7 @@ class Ticket(db.Model):
             'id': self.id,
             'room_id': self.room_id,
             'room_number': self.room.number if self.room else None,
+            'room_floor_id': self.room.floor_id if self.room else None,
             'floor_name': self.room.floor.name if self.room and self.room.floor else None,
             'asset_id': self.asset_id,
             'asset_name': self.asset.name if self.asset else None,

@@ -35,12 +35,14 @@ def login():
         if check_super_admin(email, password):
             session['is_super_admin'] = True
             session['super_admin_email'] = email
+            session['user_email'] = email
             
             # Also sign in as regular user if they exist in DB (to avoid confusion in navbar/decorators)
             user = User.query.filter_by(email=email).first()
             if user:
                 session['user_id'] = user.id
                 session['user_name'] = user.name
+                session['user_email'] = user.email
                 session['is_admin'] = user.is_admin
             
             flash('Welcome, Developer!', 'success')

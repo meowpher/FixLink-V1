@@ -9,11 +9,12 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from dotenv import load_dotenv
-from .socket_events import init_socketio
+from flask_wtf.csrf import CSRFProtect
 
 # Core instances
 db = SQLAlchemy()
 migrate = Migrate()
+csrf = CSRFProtect()
 
 # Load environment variables
 load_dotenv()
@@ -38,11 +39,15 @@ def create_app(config_name=None):
     
     database_url = os.environ.get('DATABASE_URL')
     if not database_url:
-        logger.warning(
-            'DATABASE_URL is not set. Falling back to local SQLite. '
-            'Set DATABASE_URL in your .env file for production.'
-        )
-        database_url = 'sqlite:///vyas_tracker.db'
+        # Check if we're in testing mode
+        if config_name == 'testing' or os.environ.get('TESTING') == 'True':
+            database_url = 'sqlite:///:memory:'
+            logger.info('Using in-memory SQLite for testing.')
+        else:
+            raise RuntimeError(
+                'DATABASE_URL is not set. A persistent PostgreSQL (Supabase) '
+                'connection is required for the application to start.'
+            )
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
@@ -69,8 +74,6 @@ def create_app(config_name=None):
     init_cache(app)
     
     # Security: CSRF Protection
-    from flask_wtf.csrf import CSRFProtect
-    csrf = CSRFProtect()
     csrf.init_app(app)
     
     # Security: Rate Limiting
@@ -83,10 +86,10 @@ def create_app(config_name=None):
         storage_uri="memory://",
     )
     
-    # Initialize SocketIO
-    global socketio
-    socketio = init_socketio(app)
-    
+    # Initialize database and run migrations
+    from .database import init_db
+    init_db(app)
+
     # Register blueprints
     from .blueprints.main import main_bp
     from .blueprints.admin import admin_bp
@@ -99,14 +102,15 @@ def create_app(config_name=None):
     app.register_blueprint(auth_bp)
     app.register_blueprint(professional_bp)
     app.register_blueprint(superadmin_bp)
+
+    # Pusher is initialized lazily in realtime.py
     
-    # Initialize database and run migrations
-    from .database import init_db
-    init_db(app)
-    
-    # Start background scheduler for automated alerts
-    from .scheduler import start_scheduler
-    start_scheduler(app)
+    # Start background scheduler for automated alerts (disabled on Vercel)
+    if not os.environ.get('VERCEL'):
+        from .scheduler import start_scheduler
+        start_scheduler(app)
+    else:
+        logger.info("Running on Vercel: Background scheduler disabled.")
     
     # Global Session Refresh Hook
     @app.before_request
@@ -119,6 +123,17 @@ def create_app(config_name=None):
                 # Sync critical flags
                 session['is_admin'] = user.is_admin
                 session['user_role'] = user.role
+                session['user_email'] = user.email
+    
+    # Global Template Context
+    @app.context_processor
+    def inject_globals():
+        from .blueprints.superadmin.routes import SUPER_ADMIN_EMAIL
+        return dict(
+            SUPER_ADMIN_EMAIL=SUPER_ADMIN_EMAIL,
+            PUSHER_KEY=os.environ.get('PUSHER_KEY'),
+            PUSHER_CLUSTER=os.environ.get('PUSHER_CLUSTER')
+        )
     
     # Register Jinja filters
     @app.template_filter('ist')

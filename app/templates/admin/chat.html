@@ -344,15 +344,17 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<!-- Pusher Integration -->
+<script src="https://js.pusher.com/8.0.1/pusher.min.js"></script>
 <script>
-    let socket;
+    let pusher;
+    let channel;
     const chatConfig = document.getElementById('chatConfig');
     let selectedProfessionalId = chatConfig.dataset.professionalId ? parseInt(chatConfig.dataset.professionalId) : null;
     let professionals = [];
 
     document.addEventListener('DOMContentLoaded', function() {
-        initSocket();
+        initPusher();
         loadProfessionals();
         
         document.getElementById('sendBtn').addEventListener('click', sendMessage);
@@ -365,28 +367,63 @@
         });
     });
 
-    function initSocket() {
+    function initPusher() {
+        if (!'{{ PUSHER_KEY }}') {
+            console.warn('Pusher key missing from configuration.');
+            return;
+        }
+
         try {
-            if (typeof io !== 'undefined') {
-                socket = io();
-                socket.on('new_chat_message', function(data) {
-                    console.log('Received chat message:', data, 'Selected ID:', selectedProfessionalId);
-                    // If it's from the currently selected professional, add to view
-                    if (data.sender_type === 'professional' && data.sender_id == selectedProfessionalId) {
-                        console.log('Adding message to active view');
-                        addMessageToView(data, false);
-                        // Mark as read in backend and refresh sidebar
-                        fetch(`/admin/api/chat/history/${selectedProfessionalId}`).then(() => {
-                            loadProfessionals();
-                        }); 
-                    } else if (data.sender_type === 'professional') {
-                        // Otherwise update unread count in sidebar
-                        loadProfessionals(); // Refresh list to update counts
+            Pusher.logToConsole = false;
+            pusher = new Pusher('{{ PUSHER_KEY }}', {
+                cluster: '{{ PUSHER_CLUSTER }}',
+                authEndpoint: '/pusher/auth',
+                auth: {
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                     }
-                });
-            }
+                }
+            });
+
+            channel = pusher.subscribe('private-admins');
+            
+            // Listen for new chat messages
+            channel.bind('new_chat_message', function(data) {
+                console.log('Received chat message:', data, 'Selected ID:', selectedProfessionalId);
+
+                // 1. Deduplication by ID (if fetch.then already ran)
+                if (document.querySelector(`[data-id="${data.id}"]`)) {
+                    console.log('Duplicate message ignored (ID exists):', data.id);
+                    return;
+                }
+
+                // 2. Deduplication by Pending State (if Pusher event arrives before fetch.then)
+                if (data.sender_type === 'admin') {
+                    const pendingMsg = document.querySelector('.message.sent[data-is-pending="true"]');
+                    if (pendingMsg && pendingMsg.querySelector('.message-content').innerText.trim() === data.message.trim()) {
+                        console.log('Syncing pending message with real data');
+                        pendingMsg.dataset.id = data.id;
+                        pendingMsg.dataset.isPending = 'false';
+                        pendingMsg.classList.remove('opacity-50');
+                        return;
+                    }
+                }
+
+                // If it's from the currently selected professional, add to view
+                if (data.sender_type === 'professional' && data.sender_id == selectedProfessionalId) {
+                    console.log('Adding message to active view');
+                    addMessageToView(data, false);
+                    // Mark as read in backend and refresh sidebar
+                    fetch(`/admin/api/chat/history/${selectedProfessionalId}`).then(() => {
+                        loadProfessionals();
+                    }); 
+                } else if (data.sender_type === 'professional') {
+                    // Otherwise update unread count in sidebar
+                    loadProfessionals(); // Refresh list to update counts
+                }
+            });
         } catch (e) {
-            console.error('Socket init error:', e);
+            console.error('Pusher init error:', e);
         }
     }
 
@@ -395,7 +432,7 @@
             const response = await fetch('/admin/api/chat/professionals');
             const result = await response.json();
             if (result.success) {
-                professionals = result.data.professionals;
+                professionals = result.professionals;
                 renderProfessionals();
                 
                 // If a professional was pre-selected, just update the sidebar highlighting
@@ -480,12 +517,11 @@
             const response = await fetch(`/admin/api/chat/history/${profId}`);
             const result = await response.json();
             if (result.success) {
-                const data = result.data;
                 container.innerHTML = '';
-                if (data.messages.length === 0) {
+                if (result.messages.length === 0) {
                     container.innerHTML = '<div class="text-center text-muted py-5">No messages yet. Say hello!</div>';
                 } else {
-                    data.messages.forEach(msg => {
+                    result.messages.forEach(msg => {
                         const isSentByMe = msg.sender_type === 'admin';
                         addMessageToView(msg, isSentByMe);
                     });
@@ -503,13 +539,28 @@
         const text = input.value.trim();
         if (!text || !selectedProfessionalId) return;
 
+        // Optimistic Update
+        const tempId = 'temp_' + Date.now();
+        const optimisticMsg = {
+            id: tempId,
+            message: text,
+            sender_type: 'admin',
+            timestamp: new Date().toISOString(),
+            is_pending: true
+        };
+        addMessageToView(optimisticMsg, true);
+        scrollToBottom();
+
         input.value = '';
-        document.getElementById('sendBtn').disabled = true;
+        input.focus();
 
         try {
             const response = await fetch('/admin/api/chat/send', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
                 body: JSON.stringify({
                     professional_id: selectedProfessionalId,
                     message: text
@@ -517,15 +568,22 @@
             });
             const result = await response.json();
             if (result.success) {
-                addMessageToView(result.data.message, true);
-                scrollToBottom();
+                const msgEl = document.querySelector(`[data-id="${tempId}"]`);
+                if (msgEl) {
+                    msgEl.dataset.id = result.chat_message.id;
+                    msgEl.dataset.isPending = 'false';
+                    msgEl.classList.remove('opacity-50');
+                }
+            } else {
+                const msgEl = document.querySelector(`[data-id="${tempId}"]`);
+                if (msgEl) msgEl.remove();
+                alert('Failed to send message: ' + (result.error || 'Unknown error'));
             }
         } catch (error) {
+            const msgEl = document.querySelector(`[data-id="${tempId}"]`);
+            if (msgEl) msgEl.remove();
             console.error('Error sending message:', error);
             alert('Failed to send message');
-        } finally {
-            input.focus();
-            document.getElementById('sendBtn').disabled = false;
         }
     }
 
@@ -538,9 +596,9 @@
         }
 
         const div = document.createElement('div');
-        div.className = `message ${isSentByMe ? 'sent' : 'received'}`;
-        
-        // Handle UTC ISO strings by ensuring they are treated as UTC
+        div.dataset.id = msg.id;
+        div.dataset.isPending = msg.is_pending ? 'true' : 'false';
+        div.className = `message ${isSentByMe ? 'sent' : 'received'} ${msg.is_pending ? 'opacity-50' : ''}`;
         const timestampStr = msg.timestamp.endsWith('Z') ? msg.timestamp : msg.timestamp + 'Z';
         const timestamp = new Date(timestampStr);
         const time = timestamp.toLocaleTimeString('en-IN', { 
@@ -573,7 +631,10 @@
         
         try {
             const response = await fetch(`/admin/api/chat/reset/${selectedProfessionalId}`, {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
             });
             const data = await response.json();
             

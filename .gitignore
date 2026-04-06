@@ -7,3 +7,5 @@ instance/
 venv/
 *.db
 .env
+app/static/uploads/
+server.log

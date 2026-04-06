@@ -105,7 +105,9 @@
                 </thead>
                 <tbody>
                     {% for prof in professionals %}
-                    <tr id="professional-row-{{ prof.id }}" class="border-bottom">
+                    <tr id="professional-row-{{ prof.id }}" 
+                        data-category="{{ prof.category }}" 
+                        class="border-bottom">
                         <td class="ps-4">
                             <span class="prof-id">#{{ prof.id }}</span>
                         </td>
@@ -281,17 +283,9 @@
         document.getElementById('edit-email').value = emailText;
         document.getElementById('edit-phone').value = phoneText === '-' ? '' : phoneText;
         
-        // Get category from Category cell (3rd index/4th col)
-        const categoryBadge = row.cells[3].querySelector('.status-badge');
-        const categoryText = categoryBadge.textContent.trim();
-        
-        const categorySelect = document.getElementById('edit-category');
-        for (let i = 0; i < categorySelect.options.length; i++) {
-            if (categorySelect.options[i].text.trim() === categoryText) {
-                categorySelect.selectedIndex = i;
-                break;
-            }
-        }
+        // Get category from data attribute
+        const categoryVal = row.getAttribute('data-category');
+        document.getElementById('edit-category').value = categoryVal;
         
         // Set active status from Status cell (4th index/5th col)
         const statusBadge = row.cells[4].querySelector('.status-badge');
@@ -318,12 +312,16 @@
         
         fetch(`/admin/professionals/${id}/edit`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
             body: JSON.stringify(data)
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                alert('Changes saved successfully!');
                 editModal.hide();
                 location.reload();
             } else {
@@ -339,7 +337,10 @@
         
         fetch(`/admin/professionals/${id}/delete`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'}
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
         })
         .then(response => response.json())
         .then(data => {
