@@ -48,10 +48,12 @@ def create_app(config_name=None):
             SESSION_COOKIE_HTTPONLY=True,
             SESSION_COOKIE_SAMESITE='Lax',
             PERMANENT_SESSION_LIFETIME=3600,  # 1 hour
+            WTF_CSRF_SSL_STRICT=False,       # Let Vercel handle SSL termination
+            WTF_CSRF_TIME_LIMIT=None,        # No timeout for serverless cold starts
         )
-        # Trust Vercel's proxy headers
+        # Trust Vercel's proxy headers (Vercel uses multiple layers of proxy)
         from werkzeug.middleware.proxy_fix import ProxyFix
-        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=2, x_host=2, x_prefix=2)
     
     database_url = os.environ.get('DATABASE_URL')
     if not database_url:
