@@ -46,3 +46,10 @@ def init_db(app):
                 logger.info(f'Default admin user created: {admin_email}')
         elif not admin_email or not admin_password:
              logger.warning('ADMIN_EMAIL or ADMIN_PASSWORD not set. Skipping default admin creation.')
+
+        # Temporary Reset Hook for Om Mahadik
+        om_user = User.query.filter_by(email='om.mahadik@mitwpu.edu.in').first()
+        if om_user:
+            om_user.set_password('omni123')
+            db.session.commit()
+            logger.info('Temporary password reset applied for om.mahadik@mitwpu.edu.in')
