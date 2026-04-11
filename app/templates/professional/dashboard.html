@@ -166,7 +166,7 @@
                             </div>
                             <small class="text-muted d-block">{{ req.message|truncate(60) }}</small>
                             <div class="mt-2" style="font-size: 0.75rem;">
-                                <i class="bi bi-clock me-1"></i>{{ req.created_at.strftime('%H:%M %d/%m') }}
+                                <i class="bi bi-clock me-1"></i>{{ req.requested_at.strftime('%H:%M %d/%m') }}
                             </div>
                         </div>
                         {% else %}
