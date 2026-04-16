@@ -16,6 +16,12 @@
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
+    <!-- Vercel Speed Insights -->
+    <script>
+        window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/speed-insights/script.js"></script>
+
     {% block extra_css %}{% endblock %}
 </head>
 
