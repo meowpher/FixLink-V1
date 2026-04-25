@@ -92,6 +92,243 @@
         margin-top: 5px;
     }
 
+    /* Faculty Portal Premium Design - Sidebar Layout */
+    .faculty-hero {
+        background: linear-gradient(135deg, var(--mitwpu-blue) 0%, #00d2ff 100%);
+        border-radius: 24px;
+        padding: 2.5rem 1.5rem;
+        color: white;
+        height: calc(100vh - 120px);
+        position: sticky;
+        top: 100px;
+        overflow: hidden;
+        box-shadow: 0 15px 35px rgba(0, 114, 198, 0.2);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .hero-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        margin-top: 2rem;
+        flex-grow: 1;
+    }
+
+    .nav-pills-premium {
+        position: relative;
+        z-index: 10;
+        backdrop-filter: blur(10px);
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        margin-top: auto;
+    }
+    
+    .nav-pills-premium .btn {
+        width: 100%;
+        margin-bottom: 8px;
+        justify-content: flex-start;
+        text-align: left;
+    }
+
+    /* Smart Selector Premium Styles & Theme Adapters */
+    .smart-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 8px;
+        max-height: 250px;
+        overflow-y: auto;
+        padding: 10px;
+        background: rgba(var(--mitwpu-blue-rgb), 0.05);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+    }
+    
+    [data-theme="dark"] .smart-grid { background: rgba(0,0,0,0.3); }
+
+    .room-btn {
+        padding: 10px 5px;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        background: var(--card-bg);
+        color: var(--text-color);
+        font-size: 0.75rem;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    
+    .room-btn:hover { background: var(--bg-light); transform: translateY(-2px); }
+    .room-btn.selected { background: var(--mitwpu-blue) !important; color: white !important; border-color: #00d2ff; }
+
+    .selector-group { margin-bottom: 20px; }
+    .selector-label { font-size: 0.85rem; font-weight: 700; color: var(--mitwpu-blue); margin-bottom: 10px; display: block; text-transform: uppercase; letter-spacing: 1px; }
+    
+    .btn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; }
+    .choice-btn {
+        padding: 8px;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        background: var(--card-bg);
+        color: var(--text-color);
+        font-size: 0.75rem;
+        transition: all 0.2s;
+    }
+    .choice-btn:hover { background: var(--bg-light); }
+    .choice-btn.selected { background: var(--mitwpu-blue) !important; color: white !important; border-color: #00d2ff; }
+
+    .floor-pill {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        cursor: pointer;
+        border: 1px solid var(--border-color);
+        background: var(--card-bg);
+        color: var(--text-color);
+        transition: all 0.2s;
+    }
+    .floor-pill.active { background: var(--mitwpu-blue); color: white; border-color: transparent; }
+
+    .stat-mini-card {
+        background: rgba(var(--mitwpu-blue-rgb), 0.1);
+        border: 1px solid rgba(var(--mitwpu-blue-rgb), 0.1);
+        border-radius: 18px;
+        padding: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition: transform 0.2s;
+        color: inherit;
+    }
+    
+    [data-theme="dark"] .stat-mini-card {
+        background: rgba(255, 255, 255, 0.05);
+        color: white;
+    }
+
+    .stat-mini-card:hover { transform: translateY(-5px); background: rgba(var(--mitwpu-blue-rgb), 0.2); }
+    .stat-icon {
+        width: 45px;
+        height: 45px;
+        background: white;
+        color: var(--mitwpu-blue);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .stat-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        opacity: 0.9;
+    }
+
+    .stat-value {
+        font-size: 1.2rem;
+        font-weight: 700;
+    }
+
+    /* Schedule Slot Cards */
+    .slot-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        padding: 20px;
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .slot-card:hover {
+        border-color: var(--mitwpu-blue);
+        box-shadow: var(--shadow-lg);
+        transform: translateX(10px);
+    }
+
+    .slot-card.today {
+        border-left: 6px solid var(--mitwpu-blue);
+        background: rgba(var(--mitwpu-blue-rgb), 0.02);
+    }
+
+    .slot-time-box {
+        min-width: 130px;
+        text-align: center;
+        padding: 15px;
+        background: var(--bg-light);
+        border-radius: 15px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .time-start {
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: var(--text-main);
+    }
+
+    .time-end {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+
+    .slot-details {
+        flex-grow: 1;
+    }
+
+    .slot-subject {
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+        color: var(--text-main);
+    }
+
+    .slot-meta {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .meta-item {
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--text-muted);
+    }
+
+    .meta-item i {
+        color: var(--mitwpu-blue);
+    }
+
+    .room-tag {
+        background: var(--mitwpu-blue);
+        color: white;
+        padding: 3px 12px;
+        border-radius: 30px;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .adhoc-tag {
+        background: #6f42c1;
+        color: white;
+        padding: 3px 12px;
+        border-radius: 30px;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
     /* Cyberpunk / Glassmorphism Additions */
     :root {
         --glass-bg: rgba(255, 255, 255, 0.05);
@@ -339,117 +576,266 @@
         border-color: var(--cyber-blue);
         box-shadow: 0 0 0 0.25rem rgba(0, 242, 255, 0.25);
     }
+    /* Compact Light-Themed Synchronizer */
+    .glass-modal .modal-content {
+        background: #ffffff !important;
+        color: #1e293b !important;
+        border-radius: 24px !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+        border: none !important;
+        overflow: hidden !important;
+    }
+    
+    .glass-modal .modal-header {
+        background: #f8fafc !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        padding: 1rem 1.5rem !important;
+    }
+    
+    .glass-modal .modal-title { color: #0f172a !important; font-size: 1.25rem !important; }
+    .glass-modal .btn-close { filter: invert(0) !important; }
+
+    .selector-group {
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 16px !important;
+        padding: 1.25rem !important;
+        margin-bottom: 1rem !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    }
+
+    .selector-label { 
+        color: #64748b !important; 
+        font-size: 0.7rem !important; 
+        margin-bottom: 8px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+        font-weight: 700 !important;
+    }
+
+    .form-control { color: #0f172a !important; }
+    .form-control::placeholder { color: #94a3b8 !important; }
+
+    .tt-form-container {
+        background: #f8fafc !important;
+        padding: 1.5rem !important;
+        height: 100% !important;
+    }
+
+    .smart-grid {
+        max-height: 180px !important;
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    
+    .room-btn {
+        background: #ffffff !important;
+        color: #475569 !important;
+        border: 1px solid #e2e8f0 !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    
+    .room-btn:hover { 
+        background: #f1f5f9 !important; 
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        border-color: #cbd5e1 !important;
+    }
+
+    .room-btn.selected {
+        background: #0284c7 !important;
+        color: #ffffff !important;
+        border-color: #0369a1 !important;
+        box-shadow: 0 0 15px rgba(2, 132, 199, 0.3) !important;
+    }
+    
+    .choice-btn {
+        background: #ffffff !important;
+        color: #475569 !important;
+        border: 1px solid #e2e8f0 !important;
+        padding: 8px !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .choice-btn:hover { 
+        background: #f8fafc !important;
+        border-color: #cbd5e1 !important;
+    }
+
+    .choice-btn.selected {
+        background: #0284c7 !important;
+        color: #ffffff !important;
+        border-color: #0369a1 !important;
+    }
+    
+    .floor-pill {
+        background: #ffffff !important;
+        color: #64748b !important;
+        border: 1px solid #e2e8f0 !important;
+        padding: 5px 15px !important;
+        font-weight: 600 !important;
+    }
+    
+    .floor-pill:hover { background: #f1f5f9 !important; }
+    .floor-pill.active { background: #334155 !important; color: white !important; border-color: #1e293b !important; }
+
+    .tt-entry-row {
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        color: #1e293b !important;
+        padding: 0.85rem !important;
+        margin-bottom: 0.85rem !important;
+        border-radius: 12px !important;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .tt-entry-row:hover {
+        transform: translateX(5px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05) !important;
+    }
+    
+    .text-info { color: #0284c7 !important; }
+    .text-muted { color: #64748b !important; }
+    .bg-black.bg-opacity-25 { background: #f8fafc !important; }
+
+    .glass-modal .modal-body {
+        max-height: 85vh !important;
+        overflow-y: auto !important;
+        padding: 0 !important;
+    }
+
+    .btn-gradient-primary {
+        background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%) !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.5px !important;
+        box-shadow: 0 10px 15px -3px rgba(2, 132, 199, 0.3) !important;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container faculty-dashboard mb-2">
-    <div class="row mb-3 align-items-center">
-        <div class="col-md-6">
-            <h2 class="mb-1 fw-bold">Welcome, {{ faculty.name }}</h2>
-            <p class="text-muted mb-0">Manage your schedule and claim vacant rooms instantly.</p>
-        </div>
-        <div class="col-md-6 text-md-end mt-3 mt-md-0">
-            <ul class="nav nav-pills justify-content-md-end" id="dashboard-tabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active me-2" id="btn-schedule" type="button" role="tab">
-                        <i class="bi bi-calendar-event me-2"></i>My Schedule
+<div class="container-fluid px-4 faculty-dashboard mb-2">
+    <div class="row">
+        <!-- Dashboard Sidebar -->
+        <div class="col-lg-3 col-xl-2 mb-4">
+            <div class="faculty-hero">
+                <div class="mb-4">
+                    <h1 class="h3 fw-bold mb-1">Welcome,</h1>
+                    <h2 class="h5 fw-light mb-3">{{ faculty.name }}</h2>
+                    <p class="small opacity-75 mb-0">{{ (my_schedules|length) + (my_adhoc|length) }} sessions this week.</p>
+                </div>
+
+                <div class="hero-stats">
+                    <div class="stat-mini-card">
+                        <div class="stat-icon"><i class="bi bi-calendar-event"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Regular</span>
+                            <span class="stat-value">{{ my_schedules|length }}</span>
+                        </div>
+                    </div>
+                    <div class="stat-mini-card">
+                        <div class="stat-icon"><i class="bi bi-lightning-charge"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Ad-Hoc</span>
+                            <span class="stat-value">{{ my_adhoc|length }}</span>
+                        </div>
+                    </div>
+                    <div class="stat-mini-card">
+                        <div class="stat-icon"><i class="bi bi-clock-history"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Time</span>
+                            <span class="stat-value" id="liveTime">00:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="nav-pills-premium bg-white bg-opacity-10 rounded-4 p-2 mt-4">
+                    <button class="btn rounded-3 px-3 py-2 {% if view == 'schedule' or not view %}active btn-light shadow-sm{% else %}text-white{% endif %} d-flex align-items-center" id="btn-schedule">
+                        <i class="bi bi-calendar-check me-2 fs-5"></i>Schedule
                     </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="btn-tracker" type="button" role="tab">
-                        <i class="bi bi-building me-2"></i>Room Tracker
+                    <button class="btn rounded-3 px-3 py-2 {% if view == 'tracker' %}active btn-light shadow-sm{% else %}text-white{% endif %} d-flex align-items-center" id="btn-tracker">
+                        <i class="bi bi-map me-2 fs-5"></i>Map Tracker
                     </button>
-                </li>
-            </ul>
+                </div>
+            </div>
         </div>
-    </div>
+
+        <!-- Dashboard Main Content -->
+        <div class="col-lg-9 col-xl-10">
 
     <!-- Section: My Schedule -->
     <div id="view-schedule" class="view-section active">
         <div class="row">
             <div class="col-12">
-                <div class="card schedule-card p-4">
-                    <h4 class="mb-4"><i class="bi bi-calendar3 me-2"></i>Upcoming Classes</h4>
-                    
-                    {% set days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
-                    
-                    {% if my_adhoc %}
-                    <h5 class="text-primary mt-3 mb-3">Active Ad-Hoc Bookings</h5>
-                    <div class="table-responsive mb-4">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Room</th>
-                                    <th>Subject</th>
-                                    <th>Date</th>
-                                    <th>Time Frame</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for ad in my_adhoc %}
-                                <tr>
-                                    <td><strong>{{ ad.room.number }}</strong></td>
-                                    <td>{{ ad.subject }}</td>
-                                    <td>{{ ad.start_datetime.strftime('%Y-%m-%d') }}</td>
-                                    <td>
-                                        <span class="badge bg-primary rounded-pill">
-                                            {{ ad.start_datetime.strftime('%H:%M') }} - {{ ad.end_datetime.strftime('%H:%M') }} (UTC)
-                                        </span>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                <div class="d-flex justify-content-between align-items-end mb-4">
+                    <div>
+                        <h3 class="fw-bold mb-0">Upcoming Agenda</h3>
+                        <p class="text-muted mb-0">Your synchronized teaching schedule across the Vyas building.</p>
                     </div>
-                    {% endif %}
-
-                    <div class="d-flex justify-content-between align-items-center mb-3 mt-4">
-                        <h5 class="text-primary mb-0">Weekly Regular Schedule</h5>
-                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#timetableModal">
-                            <i class="bi bi-upload me-2"></i>Sync Timetable
-                        </button>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Day</th>
-                                    <th>Room</th>
-                                    <th>Subject</th>
-                                    <th>Time</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% if my_schedules %}
-                                    {% for sched in my_schedules %}
-                                    <tr class="{% if sched.day_of_week == current_day %}table-primary bg-opacity-10{% endif %}">
-                                        <td class="fw-semibold">{{ days[sched.day_of_week] }}</td>
-                                        <td><strong>{{ sched.room.number }}</strong></td>
-                                        <td>{{ sched.subject }}</td>
-                                        <td><i class="bi bi-clock me-1 text-muted"></i>{{ sched.start_time.strftime('%I:%M %p') }} - {{ sched.end_time.strftime('%I:%M %p') }}</td>
-                                        <td>
-                                            {% if sched.day_of_week == current_day %}
-                                            <span class="badge bg-primary">Today</span>
-                                            {% else %}
-                                            <span class="badge bg-secondary">Upcoming</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                {% else %}
-                                    <tr>
-                                        <td colspan="5" class="text-center py-4 text-muted">
-                                            <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>
-                                            No regular schedule assigned.
-                                        </td>
-                                    </tr>
-                                {% endif %}
-                            </tbody>
-                        </table>
-                    </div>
+                    <button class="btn btn-primary rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#timetableModal">
+                        <i class="bi bi-arrow-repeat me-2"></i>Sync My Timetable
+                    </button>
                 </div>
+
+                <!-- Ad-Hoc Section -->
+                {% if my_adhoc %}
+                    <h5 class="fw-bold text-uppercase small letter-spacing-1 text-muted mb-3 mt-4">Active Reservations</h5>
+                    {% for ad in my_adhoc %}
+                    <div class="slot-card shadow-sm animate-on-load">
+                        <div class="slot-time-box">
+                            <div class="time-start">{{ ad.start_datetime.strftime('%H:%M') }}</div>
+                            <div class="time-end">{{ ad.end_datetime.strftime('%H:%M') }}</div>
+                        </div>
+                        <div class="slot-details">
+                            <span class="adhoc-tag mb-2 d-inline-block">Ad-Hoc Booking</span>
+                            <div class="slot-subject">{{ ad.subject }}</div>
+                            <div class="slot-meta">
+                                <div class="meta-item"><i class="bi bi-geo-alt"></i> {{ ad.room.number }}</div>
+                                <div class="meta-item"><i class="bi bi-calendar-event"></i> {{ ad.start_datetime.strftime('%d %b %Y') }}</div>
+                            </div>
+                        </div>
+                        <div class="slot-action">
+                             <span class="room-tag">RESERVED</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+
+                <!-- Regular Schedule Section -->
+                <h5 class="fw-bold text-uppercase small letter-spacing-1 text-muted mb-3 mt-4">Weekly Engagement</h5>
+                {% if my_schedules %}
+                    {% set days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
+                    {% for sched in my_schedules %}
+                    <div class="slot-card shadow-sm animate-on-load {% if sched.day_of_week == current_day %}today{% endif %}">
+                        <div class="slot-time-box">
+                            <div class="time-start">{{ sched.start_time.strftime('%I:%M') }}</div>
+                            <div class="time-end">{{ sched.end_time.strftime('%I:%M %p') }}</div>
+                        </div>
+                        <div class="slot-details">
+                            {% if sched.day_of_week == current_day %}
+                                <span class="badge bg-primary rounded-pill mb-2">Happening Today</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border rounded-pill mb-2">{{ days[sched.day_of_week] }}</span>
+                            {% endif %}
+                            <div class="slot-subject">{{ sched.subject }}</div>
+                            <div class="slot-meta">
+                                <div class="meta-item"><i class="bi bi-door-open"></i> VYAS-{{ sched.room.number }}</div>
+                                <div class="meta-item"><i class="bi bi-building"></i> Level {{ sched.room.floor.level }}</div>
+                            </div>
+                        </div>
+                        <div class="slot-action">
+                            <span class="room-tag">REGULAR</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-5 glass-card border-dashed">
+                        <i class="bi bi-calendar-x display-4 text-muted mb-3 d-block"></i>
+                        <p class="text-muted">No recurring classes found. Use "Sync Timetable" to import your schedule.</p>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -528,19 +914,118 @@
 
 <!-- Timetable Sync Modal -->
 <div class="modal fade glass-modal" id="timetableModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Neural Timetable Synchronization</h5>
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content overflow-hidden border-0 shadow-2xl" style="border-radius: 28px;">
+            <div class="modal-header border-0 bg-dark p-4">
+                <h5 class="modal-title fw-bold fs-4 d-flex align-items-center">
+                    <i class="bi bi-calendar2-week-fill me-3 text-info"></i>
+                    Neural Schedule Synchronizer
+                </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p class="small text-muted">Upload your weekly schedule to automate room reservations. The system will auto-reserve these slots for the current semester.</p>
-                <div class="mb-3">
-                    <label class="form-label">Raw Timetable Data (JSON/CSV Mapping)</label>
-                    <textarea class="form-control" id="timetableData" rows="6" placeholder='[{"room_id": 5, "day_of_week": 0, "start_time": "10:00", "subject": "Data Structures"}]'></textarea>
+            <div class="modal-body p-0">
+                <div class="row g-0 h-100">
+                    <!-- Left Column: Form -->
+                    <div class="col-lg-7 p-4">
+                        <div class="tt-form-container h-100">
+                            <div class="selector-group">
+                                <label class="selector-label">1. Course Details</label>
+                                <div class="form-floating mb-3">
+                                    <input type="text" class="form-control bg-transparent border-secondary text-main" id="ttSubject" placeholder="Subject">
+                                    <label class="text-muted small">Academic Subject Name</label>
+                                </div>
+                            </div>
+
+                            <div class="selector-group">
+                                <label class="selector-label">2. Select Classroom</label>
+                                <div class="mb-2">
+                                    <input type="text" class="form-control bg-white border-secondary text-dark mb-2" id="smartRoomSearch" placeholder="Search room number...">
+                                    <div class="d-flex flex-wrap gap-2 mb-3" id="floorFilters">
+                                        <span class="floor-pill active" data-floor="all">All Floors</span>
+                                        {% for floor in floors %}
+                                        <span class="floor-pill" data-floor="{{ floor.level }}">L{{ floor.level }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="smart-grid" id="smartRoomGrid">
+                                        {% for r in all_rooms %}
+                                        {# Filter out non-instructional spaces #}
+                                        {% if 'Lift' not in r.number and 'Washroom' not in r.number and 'Toilet' not in r.number %}
+                                        <button class="room-btn" data-id="{{ r.id }}" data-floor="{{ r.floor.level }}" data-number="{{ r.number }}">
+                                            {{ r.number }}
+                                        </button>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="selector-group">
+                                        <label class="selector-label">3. Select Day</label>
+                                        <div class="btn-grid" id="smartDayGrid">
+                                            <button class="choice-btn selected" data-day="0">Mon</button>
+                                            <button class="choice-btn" data-day="1">Tue</button>
+                                            <button class="choice-btn" data-day="2">Wed</button>
+                                            <button class="choice-btn" data-day="3">Thu</button>
+                                            <button class="choice-btn" data-day="4">Fri</button>
+                                            <button class="choice-btn" data-day="5">Sat</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="selector-group">
+                                        <label class="selector-label">4. Start Time</label>
+                                        <div class="btn-grid" id="smartTimeGrid">
+                                            {% for h in range(7, 19) %}
+                                            <button class="choice-btn {% if h == 10 %}selected{% endif %}" data-time="{{ h }}:00">
+                                                {{ h > 12 and h-12 or h }} {{ h >= 12 and 'PM' or 'AM' }}
+                                            </button>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row align-items-end">
+                                <div class="col-md-6">
+                                    <div class="selector-group mb-0">
+                                        <label class="selector-label">5. Duration</label>
+                                        <div class="btn-grid" id="smartDurationGrid">
+                                            <button class="choice-btn selected" data-duration="1">1 Hour</button>
+                                            <button class="choice-btn" data-duration="2">2 Hours</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <button type="button" class="btn btn-gradient-primary w-100 py-3 rounded-4 fs-5" id="btnAddTTEntry">
+                                        <i class="bi bi-plus-circle me-2"></i> ADD TO QUEUE
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Staging Area -->
+                    <div class="col-lg-5 p-4 bg-light">
+                        <h6 class="text-info fw-bold text-uppercase small letter-spacing-1 mb-3">Synchronization Staging</h6>
+                        <div class="tt-builder-box" id="ttBuilderQueue">
+                            <div class="text-center py-5" id="ttEmptyMsg">
+                                <div class="mb-3">
+                                    <i class="bi bi-stack display-3 opacity-10"></i>
+                                </div>
+                                <h6 class="text-white-50">Queue Empty</h6>
+                                <p class="small text-muted">Initialize entries to begin syncing.</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-auto pt-4">
+                            <button class="btn btn-gradient-primary w-100 fw-bold py-3 fs-5 rounded-4 d-none shadow-lg" id="btnSyncTimetable">
+                                <i class="bi bi-cloud-check-fill me-2"></i>DEPLOY ALL TO SYSTEM
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <button class="btn btn-primary w-100" id="btnSyncTimetable">UPLOAD TO MAINFRAME</button>
             </div>
         </div>
     </div>
@@ -602,6 +1087,25 @@
         import { renderFloorMap } from "{{ url_for('static', filename='js/modules/render.js') }}";
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Live Clock for Hero
+            function updateClock() {
+                const now = new Date();
+                document.getElementById('liveTime').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+            setInterval(updateClock, 1000);
+            updateClock();
+
+            // Staggered Entry Animation
+            if (window.gsap) {
+                gsap.from(".animate-on-load", {
+                    opacity: 0,
+                    y: 20,
+                    duration: 0.6,
+                    stagger: 0.1,
+                    ease: "power2.out"
+                });
+            }
+
             let currentStatusData = {};
             let selectedRoomId = null;
 
@@ -618,21 +1122,35 @@
             gsap.set(viewTracker, { display: 'none', opacity: 0 });
             
             function switchView(fromView, toView, btnActive, btnInactive) {
-                if (fromView === toView || toView.classList.contains('active')) return;
+                if (!fromView || !toView || toView.classList.contains('active')) return;
                 
-                btnActive.classList.add('active');
-                btnInactive.classList.remove('active');
+                // Update buttons
+                btnActive.classList.add('active', 'btn-light');
+                btnActive.classList.remove('text-white');
+                btnInactive.classList.remove('active', 'btn-light');
+                btnInactive.classList.add('text-white');
                 
-                gsap.to(fromView, {
-                    opacity: 0, duration: 0.3, ease: "power2.inOut",
-                    onComplete: () => {
-                        fromView.style.display = 'none';
-                        fromView.classList.remove('active');
-                        toView.style.display = 'block';
-                        toView.classList.add('active');
+                const onTransitionComplete = () => {
+                    fromView.style.display = 'none';
+                    fromView.classList.remove('active');
+                    toView.style.display = 'block';
+                    toView.classList.add('active');
+                    
+                    if (window.gsap) {
                         gsap.fromTo(toView, { opacity: 0, y: 15 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" });
+                    } else {
+                        toView.style.opacity = '1';
                     }
-                });
+                };
+
+                if (window.gsap) {
+                    gsap.to(fromView, {
+                        opacity: 0, duration: 0.3, ease: "power2.inOut",
+                        onComplete: onTransitionComplete
+                    });
+                } else {
+                    onTransitionComplete();
+                }
             }
 
             btnSchedule.addEventListener('click', () => {
@@ -906,19 +1424,141 @@
                 });
             }
 
-            // Timetable Sync
-            document.getElementById('btnSyncTimetable').addEventListener('click', async () => {
-                const rawData = document.getElementById('timetableData').value;
-                let data;
-                try {
-                    data = JSON.parse(rawData);
-                } catch (e) {
-                    Swal.fire({ icon: 'error', title: 'Parse Error', text: 'Invalid JSON format.' });
+            let selectedRoom = null;
+            let selectedDay = 0;
+            let selectedTime = '10:00';
+            let selectedDuration = 1;
+            const ttQueue = [];
+
+            const roomBtns = document.querySelectorAll('.room-btn');
+            const dayBtns = document.querySelectorAll('#smartDayGrid .choice-btn');
+            const timeBtns = document.querySelectorAll('#smartTimeGrid .choice-btn');
+            const durationBtns = document.querySelectorAll('#smartDurationGrid .choice-btn');
+            const roomSearch = document.getElementById('smartRoomSearch');
+            const floorFilters = document.querySelectorAll('.floor-pill');
+
+            // Room Search & Filter Logic
+            function filterRooms() {
+                const term = roomSearch.value.toLowerCase();
+                const activeFloorPill = document.querySelector('.floor-pill.active');
+                const floor = activeFloorPill ? activeFloorPill.dataset.floor : 'all';
+                
+                roomBtns.forEach(btn => {
+                    const num = btn.dataset.number.toLowerCase();
+                    const fl = btn.dataset.floor;
+                    const matchSearch = num.includes(term);
+                    const matchFloor = floor === 'all' || fl === floor;
+                    btn.classList.toggle('d-none', !matchSearch || !matchFloor);
+                });
+            }
+
+            roomSearch.addEventListener('input', filterRooms);
+            floorFilters.forEach(f => f.addEventListener('click', function() {
+                floorFilters.forEach(p => p.classList.remove('active'));
+                this.classList.add('active');
+                filterRooms();
+            }));
+
+            // Selection Listeners
+            roomBtns.forEach(btn => btn.addEventListener('click', function() {
+                roomBtns.forEach(b => b.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedRoom = { id: this.dataset.id, number: this.dataset.number };
+            }));
+
+            dayBtns.forEach(btn => btn.addEventListener('click', function() {
+                dayBtns.forEach(b => b.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedDay = parseInt(this.dataset.day);
+            }));
+
+            timeBtns.forEach(btn => btn.addEventListener('click', function() {
+                timeBtns.forEach(b => b.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedTime = this.dataset.time;
+            }));
+
+            durationBtns.forEach(btn => btn.addEventListener('click', function() {
+                durationBtns.forEach(b => b.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedDuration = parseInt(this.dataset.duration);
+            }));
+
+            // Add to Queue
+            const queueBox = document.getElementById('ttBuilderQueue');
+            const syncBtn = document.getElementById('btnSyncTimetable');
+            const emptyMsg = document.getElementById('ttEmptyMsg');
+
+            document.getElementById('btnAddTTEntry').addEventListener('click', () => {
+                const subject = document.getElementById('ttSubject').value.trim();
+
+                if (!selectedRoom || !subject) {
+                    Swal.fire({ icon: 'warning', title: 'Data Missing', text: 'Please select a classroom and enter a subject.' });
                     return;
                 }
 
-                const btn = document.getElementById('btnSyncTimetable');
-                btn.disabled = true;
+                const dayName = document.querySelector('#smartDayGrid .selected').textContent;
+                const entry = { 
+                    room_id: parseInt(selectedRoom.id), 
+                    room_number: selectedRoom.number, 
+                    day_of_week: selectedDay, 
+                    day_name: dayName, 
+                    start_time: selectedTime, 
+                    subject: subject,
+                    duration: selectedDuration
+                };
+                
+                ttQueue.push(entry);
+                renderTTQueue();
+                document.getElementById('ttSubject').value = '';
+            });
+
+            function renderTTQueue() {
+                if (ttQueue.length === 0) {
+                    emptyMsg.classList.remove('d-none');
+                    syncBtn.classList.add('d-none');
+                    queueBox.innerHTML = '';
+                    queueBox.appendChild(emptyMsg);
+                    return;
+                }
+
+                emptyMsg.classList.add('d-none');
+                syncBtn.classList.remove('d-none');
+                
+                queueBox.innerHTML = ttQueue.map((e, index) => `
+                    <div class="tt-entry-row text-main animate-on-load">
+                        <button type="button" class="btn-remove-entry" onclick="window.removeTTEntry(${index})">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                        <div class="row align-items-center">
+                            <div class="col-3">
+                                <span class="badge bg-info bg-opacity-25 text-info px-2 py-1 rounded">VYAS-${e.room_number}</span>
+                            </div>
+                            <div class="col-5">
+                                <div class="small fw-bold">${e.day_name} @ ${e.start_time}</div>
+                                <div class="text-muted extra-small">${e.duration} Hr Session</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="fw-bold text-info small truncate-text">${e.subject}</div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                if (window.gsap) {
+                    gsap.from(".tt-entry-row:last-child", { opacity: 0, x: -20, duration: 0.4 });
+                }
+            }
+
+            window.removeTTEntry = (index) => {
+                ttQueue.splice(index, 1);
+                renderTTQueue();
+            };
+
+            syncBtn.addEventListener('click', async () => {
+                syncBtn.disabled = true;
+                const originalText = syncBtn.innerHTML;
+                syncBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Syncing...';
 
                 try {
                     const res = await fetch('/faculty/api/faculty/timetable', {
@@ -927,20 +1567,19 @@
                             'Content-Type': 'application/json',
                             'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
                         },
-                        body: JSON.stringify(data)
+                        body: JSON.stringify(ttQueue)
                     });
                     const result = await res.json();
                     if (result.success) {
-                        timetableModal.hide();
-                        Swal.fire({ icon: 'success', title: 'Sync Complete', text: result.message });
+                        Swal.fire({ icon: 'success', title: 'Schedule Synced', text: result.message });
                         location.reload();
                     } else {
                         Swal.fire({ icon: 'error', title: 'Sync Failed', text: result.error });
                     }
-                } catch (err) {
-                    console.error(err);
-                } finally {
-                    btn.disabled = false;
+                } catch (err) { console.error(err); }
+                finally {
+                    syncBtn.disabled = false;
+                    syncBtn.innerHTML = originalText;
                 }
             });
         });

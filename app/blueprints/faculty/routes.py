@@ -52,6 +52,7 @@ def dashboard():
     return render_template('faculty/dashboard.html',
                            faculty=faculty,
                            floors=floors,
+                           all_rooms=all_rooms,
                            rooms_by_floor=rooms_by_floor,
                            my_schedules=my_schedules,
                            my_adhoc=my_adhoc,
