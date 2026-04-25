@@ -27,6 +27,7 @@
                             <th>Username</th>
                             <th>Phone</th>
                             <th>Category</th>
+                            <th>Password</th>
                             <th>Status</th>
                             <th>Created</th>
                             <th>Actions</th>
@@ -41,6 +42,15 @@
                             <td>{{ prof.phone or '-' }}</td>
                             <td>
                                 <span class="badge bg-info">{{ category_names.get(prof.category, prof.category) }}</span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <code class="me-2 text-primary" id="pwd-{{ prof.id }}" style="display: none;">{{ prof.plaintext_password or 'N/A' }}</code>
+                                    <code class="me-2 text-muted" id="stars-{{ prof.id }}">********</code>
+                                    <button class="btn btn-sm p-0 border-0" onclick="toggleReveal({{ prof.id }})">
+                                        <i class="bi bi-eye-fill text-muted" id="icon-{{ prof.id }}"></i>
+                                    </button>
+                                </div>
                             </td>
                             <td>
                                 {% if prof.is_active %}
@@ -232,6 +242,24 @@
             console.error('Error:', error);
             alert('An error occurred');
         });
+    }
+
+    function toggleReveal(profId) {
+        const pwd = document.getElementById(`pwd-${profId}`);
+        const stars = document.getElementById(`stars-${profId}`);
+        const icon = document.getElementById(`icon-${profId}`);
+        
+        if (pwd.style.display === 'none') {
+            pwd.style.display = 'inline';
+            stars.style.display = 'none';
+            icon.classList.remove('bi-eye-fill');
+            icon.classList.add('bi-eye-slash-fill');
+        } else {
+            pwd.style.display = 'none';
+            stars.style.display = 'inline';
+            icon.classList.remove('bi-eye-slash-fill');
+            icon.classList.add('bi-eye-fill');
+        }
     }
 </script>
 {% endblock %}

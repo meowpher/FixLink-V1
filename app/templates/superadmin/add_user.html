@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Add User - Developer Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-1">
+                            <li class="breadcrumb-item"><a href="{{ url_for('superadmin.dashboard') }}">Developer</a></li>
+                            <li class="breadcrumb-item"><a href="{{ url_for('superadmin.list_users') }}">Users</a></li>
+                            <li class="breadcrumb-item active">Add User</li>
+                        </ol>
+                    </nav>
+                    <h2 class="mb-0"><i class="bi bi-person-plus-fill me-2"></i>Add New User</h2>
+                </div>
+                <a href="{{ url_for('superadmin.list_users') }}" class="btn btn-outline-secondary">Back to List</a>
+            </div>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="name" class="form-label fw-bold">Full Name *</label>
+                                <input type="text" class="form-control" id="name" name="name" required 
+                                       value="{{ form_data.name if form_data else '' }}" placeholder="Enter full name">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="role" class="form-label fw-bold">Account Role *</label>
+                                <select class="form-select" id="role" name="role" required>
+                                    {% set selected_role = request.args.get('role', 'student') %}
+                                    {% for role in roles %}
+                                    <option value="{{ role }}" {% if form_data and form_data.role == role %}selected{% elif not form_data and role == selected_role %}selected{% endif %}>
+                                        {{ role.capitalize() }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label fw-bold">Email Address *</label>
+                            <input type="email" class="form-control" id="email" name="email" required
+                                   value="{{ form_data.email if form_data else '' }}" placeholder="user@mitwpu.edu.in">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="prn" class="form-label fw-bold">PRN / ID Number</label>
+                            <input type="text" class="form-control" id="prn" name="prn"
+                                   value="{{ form_data.prn if form_data else '' }}" placeholder="e.g. 10xxxxxxxx">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="password" class="form-label fw-bold">Password *</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="password" name="password" required minlength="8" placeholder="At least 8 characters">
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('superadmin.list_users') }}" class="btn btn-light px-4">Cancel</a>
+                            <button type="submit" class="btn btn-primary px-5">Create User</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('togglePassword').addEventListener('click', function() {
+        const pwd = document.getElementById('password');
+        const icon = this.querySelector('i');
+        if (pwd.type === 'password') {
+            pwd.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            pwd.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    });
+</script>
+{% endblock %}

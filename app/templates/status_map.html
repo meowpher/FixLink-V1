@@ -105,16 +105,19 @@
 
         </div>
 
-        <!-- Room Details Panel -->
-        <div class="room-details-panel" id="roomDetailsPanel" style="display: none;">
-            <div class="panel-header">
-                <h5 id="panelRoomNumber">Room Details</h5>
-                <button class="btn-close" onclick="closeRoomDetails()"></button>
-            </div>
-            <div class="panel-body" id="panelBody">
-                <!-- Dynamic content -->
-            </div>
-        </div>
+    </div>
+</section>
+
+<!-- Admin Room Details Panel moved to root of content -->
+<div class="room-details-panel" id="roomDetailsPanel">
+    <div class="panel-header">
+        <h5 id="panelRoomNumber">Room Details</h5>
+        <button class="btn-close" onclick="closeRoomDetails()"></button>
+    </div>
+    <div class="panel-body" id="panelBody">
+        <!-- Dynamic content -->
+    </div>
+</div>
         {% else %}
         <div class="empty-state-card text-center py-5 fade-in">
             <i class="bi bi-building display-1 text-muted"></i>
@@ -131,16 +134,38 @@
 
 {% block extra_js %}
 <script type="module">
-    import { initializeAdminMap } from "{{ url_for('static', filename='js/modules/admin_map.js') }}";
+    import { initializeAdminMap, highlightRoom, showRoomDetails } from "{{ url_for('static', filename='js/modules/admin_map.js') }}";
     
-    // Global floor data from server - using a safe way to handle null/undefined
+    // Global floor data from server
     const currentFloorId = {{ selected_floor.id if selected_floor else 'null' }};
     
-    document.addEventListener('DOMContentLoaded', function () {
-        if (currentFloorId) {
-            initializeAdminMap(currentFloorId);
+    // Auto-initialize if floor is selected
+    if (currentFloorId) {
+        initializeAdminMap(currentFloorId);
+    }
+
+    // Override selectRoom for admin view
+    window.selectRoom = (event, roomNumber, roomId, roomName) => {
+        highlightRoom(roomNumber);
+        
+        const panel = document.getElementById('roomDetailsPanel');
+        panel.style.display = 'block';
+        
+        // Static Slide Animation
+        gsap.fromTo(panel, { opacity: 0, x: 50 }, { opacity: 1, x: 0, duration: 0.3 });
+
+        showRoomDetails(roomNumber, roomId);
+    };
+
+    window.closeRoomDetails = () => {
+        const panel = document.getElementById('roomDetailsPanel');
+        if (panel) {
+            gsap.to(panel, { opacity: 0, x: 50, duration: 0.2, onComplete: () => {
+                panel.style.display = 'none';
+            }});
         }
-    });
+        document.querySelectorAll('.room-group, .room-poly').forEach(el => el.classList.remove('selected'));
+    };
 
     // Handle room deep-linking and focus
     function focusRoom(roomNumber) {
@@ -156,23 +181,34 @@
 </script>
 
 <style>
-    .room-details-panel {
-        position: fixed;
-        top: 80px;
-        right: 20px;
-        width: 320px;
+    /* Static Side Position for Admin */
+    #roomDetailsPanel {
+        position: fixed !important;
+        top: 100px !important;
+        right: 30px !important;
+        left: auto !important;
+        transform: none !important;
+        width: 380px;
         background: white;
-        border-radius: 12px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-        z-index: 1000;
+        border-radius: 16px;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        z-index: 1050;
         overflow: hidden;
         border: 1px solid rgba(0,0,0,0.05);
-        animation: slideInRight 0.3s ease-out;
+        display: none;
     }
-    
-    @keyframes slideInRight {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
+
+    /* Static Floating Pop-up - Locked to Side */
+    #roomPopUp {
+        position: fixed !important;
+        top: 100px !important;
+        right: 30px !important;
+        left: auto !important;
+        transform: none !important;
+        z-index: 1050;
+        width: 380px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: none;
     }
 
     .action-btn {

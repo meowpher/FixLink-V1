@@ -225,7 +225,7 @@
 
     <!-- Stats Overview -->
     <div class="row g-4 mb-5">
-        <div class="col-md-4 animate-on-load" style="opacity: 0; transform: translateY(20px);">
+        <div class="col-md-3 animate-on-load" style="opacity: 0; transform: translateY(20px);">
             <div class="dev-stat-card">
                 <div class="stat-icon-wrapper bg-primary bg-opacity-10 text-primary">
                     <i class="bi bi-shield-lock"></i>
@@ -238,7 +238,20 @@
             </div>
         </div>
 
-        <div class="col-md-4 animate-on-load" style="opacity: 0; transform: translateY(20px);">
+        <div class="col-md-3 animate-on-load" style="opacity: 0; transform: translateY(20px);">
+            <div class="dev-stat-card">
+                <div class="stat-icon-wrapper bg-warning bg-opacity-10 text-warning">
+                    <i class="bi bi-mortarboard"></i>
+                </div>
+                <div class="stats-label">Faculty Staff</div>
+                <div class="stats-value">{{ faculty_count }}</div>
+                <a href="{{ url_for('superadmin.list_users', role='faculty') }}" class="stats-link">
+                    Staff Directory <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="col-md-3 animate-on-load" style="opacity: 0; transform: translateY(20px);">
             <div class="dev-stat-card">
                 <div class="stat-icon-wrapper bg-success bg-opacity-10 text-success">
                     <i class="bi bi-tools"></i>
@@ -251,7 +264,7 @@
             </div>
         </div>
 
-        <div class="col-md-4 animate-on-load" style="opacity: 0; transform: translateY(20px);">
+        <div class="col-md-3 animate-on-load" style="opacity: 0; transform: translateY(20px);">
             <div class="dev-stat-card">
                 <div class="stat-icon-wrapper bg-info bg-opacity-10 text-info">
                     <i class="bi bi-people"></i>
@@ -267,20 +280,33 @@
 
     <!-- Main Actions -->
     <div class="row g-4 mb-5">
-        <div class="col-md-6 animate-on-load" style="opacity: 0; transform: translateY(20px);">
+        <div class="col-md-4 animate-on-load" style="opacity: 0; transform: translateY(20px);">
             <div class="dev-action-card">
                 <div class="action-icon-large text-primary">
                     <i class="bi bi-person-plus-fill"></i>
                 </div>
                 <h3>Enroll Administrator</h3>
                 <p>Grant full dashboard privileges to a new administrative staff member.</p>
-                <a href="{{ url_for('superadmin.add_admin') }}" class="btn btn-primary btn-lg rounded-pill px-5 shadow">
+                <a href="{{ url_for('superadmin.add_user', role='admin') }}" class="btn btn-primary btn-lg rounded-pill px-5 shadow">
                     <i class="bi bi-plus-lg me-2"></i>Add Admin
                 </a>
             </div>
         </div>
 
-        <div class="col-md-6 animate-on-load" style="opacity: 0; transform: translateY(20px);">
+        <div class="col-md-4 animate-on-load" style="opacity: 0; transform: translateY(20px);">
+            <div class="dev-action-card">
+                <div class="action-icon-large text-warning">
+                    <i class="bi bi-mortarboard-fill"></i>
+                </div>
+                <h3>Enroll Faculty</h3>
+                <p>Register a new faculty member with classroom booking and portal access.</p>
+                <a href="{{ url_for('superadmin.add_user', role='faculty') }}" class="btn btn-warning btn-lg rounded-pill px-5 shadow">
+                    <i class="bi bi-plus-lg me-2"></i>Add Faculty
+                </a>
+            </div>
+        </div>
+
+        <div class="col-md-4 animate-on-load" style="opacity: 0; transform: translateY(20px);">
             <div class="dev-action-card">
                 <div class="action-icon-large text-success">
                     <i class="bi bi-wrench-adjustable-circle-fill"></i>

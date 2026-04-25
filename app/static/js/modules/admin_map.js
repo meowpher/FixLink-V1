@@ -22,11 +22,7 @@ export async function initializeAdminMap(floorId) {
             container.innerHTML = '';
             renderFloorMap(container, result.rooms, result.floor.level.toString(), true);
             
-            // Override selectRoom for admin view
-            window.selectRoom = (roomNumber, roomId, roomName) => {
-                highlightRoom(roomNumber);
-                showRoomDetails(roomNumber, roomId);
-            };
+            // Handler is now managed in the status_map.html template for contextual positioning
 
             // Handle deep-linking to specific room
             const urlParams = new URLSearchParams(window.location.search);
@@ -95,21 +91,18 @@ function renderRoomDetails(container, data) {
         </div>
 
         <div class="px-3">
-            <div class="action-bar d-flex gap-2 mb-4">
-                <button onclick="toggleAssignForm()" class="action-btn btn-assign" title="Assign Technician">
-                    <i class="bi bi-person-plus-fill"></i>
+            <div class="action-bar d-flex flex-column gap-2 mb-4">
+                <button onclick="toggleAssignForm()" class="btn btn-primary w-100 fw-bold py-2" title="Assign Technician">
+                    <i class="bi bi-person-plus-fill me-2"></i>Assign Technician
                 </button>
                 ${active_ticket ? `
-                    <button onclick="completeTicket(${active_ticket.id})" class="action-btn btn-complete" title="Mark as Fixed">
-                        <i class="bi bi-check-lg"></i>
+                    <button onclick="completeTicket(${active_ticket.id})" class="btn btn-success w-100 fw-bold py-2" title="Mark as Fixed">
+                        <i class="bi bi-check-lg me-2"></i>Resolve Issue
                     </button>
-                    <button onclick="deleteTicketFromMap(${active_ticket.id})" class="action-btn btn-delete" title="Delete Ticket">
-                        <i class="bi bi-trash-fill"></i>
+                    <button onclick="deleteTicketFromMap(${active_ticket.id})" class="btn btn-outline-danger w-100 fw-bold py-2" title="Delete Ticket">
+                        <i class="bi bi-trash-fill me-2"></i>Remove Ticket
                     </button>
                 ` : ''}
-                <button onclick="window.focusRoom('${room.number}')" class="action-btn btn-map ms-auto" title="Focus Room">
-                    <i class="bi bi-geo-alt-fill"></i>
-                </button>
             </div>
         </div>
 
@@ -181,7 +174,7 @@ function renderRoomDetails(container, data) {
     container.innerHTML = html;
 }
 
-function highlightRoom(roomNumber) {
+export function highlightRoom(roomNumber) {
     document.querySelectorAll('.room-group, .room-poly').forEach(el => el.classList.remove('selected'));
     const roomGroup = document.querySelector(`g[data-room="${roomNumber}"]`);
     if (roomGroup) {

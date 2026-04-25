@@ -57,7 +57,7 @@ export const DYNAMIC_ISSUE_TYPES = {
  * @param {string} roomName 
  * @param {string} roomType 
  */
-export function selectRoom(roomNumber, roomId, roomName, roomType) {
+export function selectRoom(event, roomNumber, roomId, roomName, roomType) {
     // Update hidden input
     const roomInput = document.getElementById('room_id');
     if (roomInput) roomInput.value = roomId;

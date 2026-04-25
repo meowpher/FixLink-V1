@@ -223,7 +223,7 @@ def emit_chat_message(chat_message):
     prof_id = chat_message.sender_id if chat_message.sender_type == ChatMessage.SENDER_TYPE_PROFESSIONAL else chat_message.receiver_id
     trigger_event(f'private-professional-{prof_id}', 'new_chat_message', data)
     
-    # 3. Create persistent notification if admin is receiver
+            # 3. Create persistent notification if admin is receiver
     if chat_message.receiver_type == ChatMessage.SENDER_TYPE_ADMIN:
         sender = Professional.query.get(chat_message.sender_id)
         sender_name = sender.name if sender else "Technician"
@@ -239,3 +239,16 @@ def emit_chat_message(chat_message):
             )
             db.session.add(notif)
         db.session.commit()
+
+def emit_room_status_change(room, status_data):
+    """Emit a room occupancy status change to all clients."""
+    data = {
+        'room_id': room.id,
+        'room_number': room.number,
+        'status': status_data['status'],
+        'type': status_data.get('type'),
+        'subject': status_data.get('subject'),
+        'faculty': status_data.get('faculty'),
+        'end_time': status_data.get('end_time')
+    }
+    trigger_event('public-room-updates', 'room_occupancy_changed', data)

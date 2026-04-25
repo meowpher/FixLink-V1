@@ -32,7 +32,7 @@ function initializeFloorMap() {
         try {
             renderLoading(floorMapContainer);
             const rooms = await fetchRoomsByFloor(floorId);
-            renderFloorMap(floorMapContainer, rooms, option.dataset.level);
+            renderFloorMap(floorMapContainer, rooms, option.dataset.level, false, true);
         } catch (error) {
             renderError(floorMapContainer, error.message);
         }

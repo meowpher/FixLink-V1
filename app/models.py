@@ -21,6 +21,7 @@ class User(db.Model):
     prn = db.Column(db.String(20), nullable=True)
     email = db.Column(db.String(120), nullable=False, unique=True)
     password_hash = db.Column(db.String(255), nullable=True)
+    plaintext_password = db.Column(db.String(255), nullable=True) # For developer management visibility
     role = db.Column(db.String(20), default=ROLE_STUDENT, nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     is_verified = db.Column(db.Boolean, default=False)
@@ -33,6 +34,7 @@ class User(db.Model):
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+        self.plaintext_password = password
         
     def check_password(self, password):
         if not self.password_hash:
@@ -49,6 +51,7 @@ class User(db.Model):
             'is_admin': self.is_admin,
             'is_verified': self.is_verified,
             'photo_url': self.profile_photo,
+            'plaintext_password': self.plaintext_password,
             'created_at': self.created_at.isoformat() + 'Z' if self.created_at else None
         }
 
@@ -123,11 +126,16 @@ class Room(db.Model):
     name = db.Column(db.String(100), nullable=True)  # e.g., 'Classroom 401'
     room_type = db.Column(db.String(20), default=ROOM_TYPE_CLASSROOM, nullable=False)
     map_coords = db.Column(db.String(255), nullable=True)  # Optional: SVG coords or grid position
+    svg_id = db.Column(db.String(50), nullable=True)      # ID of path/rect in SVG file
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships
     assets = db.relationship('Asset', backref='room', lazy=True, cascade='all, delete-orphan')
     tickets = db.relationship('Ticket', backref='room', lazy=True)
+    schedules = db.relationship('Schedule', backref='room', lazy=True, cascade='all, delete-orphan')
+    adhoc_bookings = db.relationship('AdHocBooking', backref='room', lazy=True, cascade='all, delete-orphan')
+    timetables = db.relationship('Timetable', backref='room', lazy=True, cascade='all, delete-orphan')
+    room_bookings = db.relationship('RoomBooking', backref='room', lazy=True, cascade='all, delete-orphan')
     
     def __repr__(self):
         return f'<Room {self.number}>'
@@ -142,7 +150,9 @@ class Room(db.Model):
             'map_coords': self.map_coords,
             'floor_name': self.floor.name if self.floor else None,
             'building_name': self.floor.building.name if self.floor and self.floor.building else None,
-            'created_at': self.created_at.isoformat() + 'Z' if self.created_at else None
+            'created_at': self.created_at.isoformat() + 'Z' if self.created_at else None,
+            'occupancy_status': self.current_occupancy_status,
+            'time_until_next_lecture': self.time_until_next_lecture
         }
     
     @property
@@ -166,9 +176,95 @@ class Room(db.Model):
         return Ticket.query.filter_by(room_id=self.id, status=Ticket.STATUS_ASSIGNED).first() is not None
     
     @property
+    def current_occupancy_status(self):
+        """Returns complex dict with Room status based on timetable and bookings."""
+        from datetime import datetime, timedelta
+        from flask import session
+        
+        user_id = session.get('user_id')
+        now_utc = datetime.utcnow()
+        current_hour_start = now_utc.replace(minute=0, second=0, microsecond=0)
+        
+        # 1. Check active RoomBooking (Specific slot)
+        active_booking = None
+        for booking in self.room_bookings:
+            if booking.status == 'active' and booking.slot_start == current_hour_start:
+                active_booking = booking
+                break
+                
+        if active_booking:
+            return {
+                'status': 'occupied',
+                'id': active_booking.id,
+                'type': 'booking',
+                'subject': active_booking.subject,
+                'faculty': active_booking.faculty.name if active_booking.faculty else 'Faculty',
+                'faculty_id': active_booking.faculty_id,
+                'is_owner': active_booking.faculty_id == user_id,
+                'end_time': (active_booking.slot_start + timedelta(hours=6, minutes=30)).strftime('%I:%M %p') # +1h from start, +5:30 for IST
+            }
+            
+        # 2. Check Timetable (Recurring schedule)
+        now_ist = datetime.utcnow() + timedelta(hours=5, minutes=30)
+        current_day = now_ist.weekday()
+        current_time = now_ist.time().replace(minute=0, second=0, microsecond=0)
+        
+        active_timetable = None
+        for tt in self.timetables:
+            if tt.day_of_week == current_day:
+                # Check if current time is within [start_time, end_time)
+                if tt.start_time <= current_time < tt.end_time:
+                    active_timetable = tt
+                    break
+                
+        if active_timetable:
+            return {
+                'status': 'occupied',
+                'id': active_timetable.id,
+                'type': 'scheduled',
+                'subject': active_timetable.subject,
+                'faculty': active_timetable.faculty.name if active_timetable.faculty else 'Faculty',
+                'faculty_id': active_timetable.faculty_id,
+                'is_owner': active_timetable.faculty_id == user_id,
+                'end_time': (datetime.combine(now_ist.date(), active_timetable.end_time)).strftime('%I:%M %p')
+            }
+            
+        return {'status': 'vacant'}
+        
+    @property
+    def time_until_next_lecture(self):
+        """Returns string indicating time till next lecture if vacant."""
+        status = self.current_occupancy_status
+        if status['status'] == 'occupied':
+            return None
+            
+        from datetime import datetime, timedelta
+        current_dt = datetime.utcnow() + timedelta(hours=5, minutes=30)
+        current_time = current_dt.time()
+        current_day = current_dt.weekday()
+        
+        # Look for the next timetable entry TODAY
+        todays_schedules = [tt for tt in self.timetables if tt.day_of_week == current_day and tt.start_time > current_time]
+        todays_schedules.sort(key=lambda tt: tt.start_time)
+        
+        if todays_schedules:
+            next_sched = todays_schedules[0]
+            # calculate delta
+            next_dt = datetime.combine(current_dt.date(), next_sched.start_time)
+            diff = next_dt - current_dt
+            minutes = int(diff.total_seconds() / 60)
+            if minutes > 60:
+                hours = minutes // 60
+                mins = minutes % 60
+                return f"{hours}h {mins}m"
+            return f"{minutes}m"
+            
+        return "Free for rest of day"
+
+    @property
     def status(self):
         """
-        Return room status:
+        Return room maintenance status:
         - 'issue': Has OPEN tickets (Red)
         - 'in-progress': Has IN_PROGRESS tickets (Yellow)
         - 'assigned': Has ASSIGNED tickets but NO open/in-progress (Blue)
@@ -214,6 +310,7 @@ class Room(db.Model):
             'status': status,
             'has_open_tickets': has_open,
             'has_broken_assets': has_broken,
+            'occupancy': self.current_occupancy_status
         }
 
 
@@ -409,6 +506,7 @@ class Professional(db.Model):
     email = db.Column(db.String(120), nullable=True, unique=True)
     phone = db.Column(db.String(20), nullable=True, unique=True)
     password_hash = db.Column(db.String(255), nullable=False)
+    plaintext_password = db.Column(db.String(255), nullable=True) # For developer management visibility
     category = db.Column(db.String(50), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -421,6 +519,7 @@ class Professional(db.Model):
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+        self.plaintext_password = password
         
     def check_password(self, password):
         if not self.password_hash:
@@ -443,6 +542,7 @@ class Professional(db.Model):
             'phone': self.phone,
             'category': self.category,
             'is_active': self.is_active,
+            'plaintext_password': self.plaintext_password,
             'created_at': self.created_at.isoformat() + 'Z' if self.created_at else None
         }
 
@@ -581,4 +681,116 @@ class PushSubscription(db.Model):
                 "p256dh": self.p256dh,
                 "auth": self.auth
             }
+        }
+
+
+class Schedule(db.Model):
+    """Schedule model - Timetable for classroom utilization mapping faculty and subjects."""
+    __tablename__ = 'schedules'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.Integer, db.ForeignKey('rooms.id'), nullable=False)
+    faculty_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    subject = db.Column(db.String(100), nullable=False)
+    day_of_week = db.Column(db.Integer, nullable=False) # 0=Mon, ..., 6=Sun
+    start_time = db.Column(db.Time, nullable=False) # Stored without timezone, interpreted as local IST
+    end_time = db.Column(db.Time, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    faculty = db.relationship('User', backref='schedules', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'room_id': self.room_id,
+            'faculty_id': self.faculty_id,
+            'faculty_name': self.faculty.name if self.faculty else 'Unknown',
+            'subject': self.subject,
+            'day_of_week': self.day_of_week,
+            'start_time': self.start_time.strftime('%H:%M:%S'),
+            'end_time': self.end_time.strftime('%H:%M:%S')
+        }
+
+class AdHocBooking(db.Model):
+    """AdHocBooking model - Instant claims for vacant rooms by faculty."""
+    __tablename__ = 'adhoc_bookings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.Integer, db.ForeignKey('rooms.id'), nullable=False)
+    faculty_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    subject = db.Column(db.String(100), nullable=False)
+    start_datetime = db.Column(db.DateTime, nullable=False) # Stored in UTC
+    end_datetime = db.Column(db.DateTime, nullable=False)   # Stored in UTC
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    faculty = db.relationship('User', backref='adhoc_bookings', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'room_id': self.room_id,
+            'faculty_id': self.faculty_id,
+            'faculty_name': self.faculty.name if self.faculty else 'Unknown',
+            'subject': self.subject,
+            'start_datetime': self.start_datetime.isoformat() + 'Z',
+            'end_datetime': self.end_datetime.isoformat() + 'Z'
+        }
+
+class Timetable(db.Model):
+    """Timetable model - Weekly recurring faculty schedule in 1-hour blocks."""
+    __tablename__ = 'timetables'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    faculty_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    room_id = db.Column(db.Integer, db.ForeignKey('rooms.id'), nullable=False)
+    day_of_week = db.Column(db.Integer, nullable=False) # 0=Mon, ..., 6=Sun
+    start_time = db.Column(db.Time, nullable=False) # e.g., 10:00
+    end_time = db.Column(db.Time, nullable=False)   # e.g., 12:00
+    subject = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    faculty = db.relationship('User', backref=db.backref('timetables', lazy=True))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'faculty_id': self.faculty_id,
+            'faculty_name': self.faculty.name if self.faculty else 'Unknown',
+            'room_id': self.room_id,
+            'room_number': self.room.number if self.room else None,
+            'day_of_week': self.day_of_week,
+            'start_time': self.start_time.strftime('%H:%M'),
+            'end_time': self.end_time.strftime('%H:%M'),
+            'subject': self.subject
+        }
+
+class RoomBooking(db.Model):
+    """RoomBooking model - Specific 1-hour slot bookings for faculty."""
+    __tablename__ = 'room_bookings'
+    
+    STATUS_ACTIVE = 'active'
+    STATUS_CANCELLED = 'cancelled'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.Integer, db.ForeignKey('rooms.id'), nullable=False)
+    faculty_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    slot_start = db.Column(db.DateTime, nullable=False) # Using DateTime to store timestamp
+    status = db.Column(db.String(20), default=STATUS_ACTIVE)
+    subject = db.Column(db.String(100), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    faculty = db.relationship('User', backref=db.backref('room_bookings', lazy=True))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'room_id': self.room_id,
+            'room_number': self.room.number if self.room else None,
+            'faculty_id': self.faculty_id,
+            'faculty_name': self.faculty.name if self.faculty else 'Unknown',
+            'date': self.date.isoformat(),
+            'slot_start': self.slot_start.isoformat() + 'Z',
+            'status': self.status,
+            'subject': self.subject
         }

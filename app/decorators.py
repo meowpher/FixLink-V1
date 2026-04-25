@@ -42,6 +42,25 @@ def user_login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def faculty_login_required(f):
+    """Decorator to require faculty login (or admin for testing)."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        from .models import User
+        if 'user_id' not in session:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'errors': ['Session expired. Please log in again.']}), 401
+            return redirect(url_for('auth.login'))
+            
+        user = User.query.get(session['user_id'])
+        if not user or (user.role != User.ROLE_FACULTY and not user.is_admin):
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'errors': ['Faculty access required.']}), 403
+            flash('Faculty access required.', 'error')
+            return redirect(url_for('main.report_form'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 def professional_login_required(f):
     """Decorator to require professional login."""
     @wraps(f)

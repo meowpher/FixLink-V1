@@ -1382,3 +1382,97 @@ def reset_professional_chat(prof_id):
         'success': True,
         'message': "Chat history reset successfully"
     })
+
+
+@admin_bp.route('/timetable', methods=['GET', 'POST'])
+@admin_required
+def timetable():
+    """Manage weekly timetable."""
+    from ...models import Timetable, Room, User
+    from datetime import time
+    
+    if request.method == 'POST':
+        room_id = request.form.get('room_id')
+        faculty_id = request.form.get('faculty_id')
+        subject = request.form.get('subject')
+        day_of_week = int(request.form.get('day_of_week', 0))
+        start_hour = int(request.form.get('start_hour', 8))
+        duration = int(request.form.get('duration', 1))
+        
+        if not all([room_id, faculty_id, subject]):
+            flash('All fields are required.', 'error')
+        else:
+            try:
+                # Calculate end hour and cap it at 23:59
+                end_hour = start_hour + duration
+                new_start = time(start_hour, 0)
+                
+                if end_hour >= 24:
+                    new_end = time(23, 59, 59)
+                else:
+                    new_end = time(end_hour, 0)
+                
+                conflicts = Timetable.query.filter_by(room_id=room_id, day_of_week=day_of_week).all()
+                has_conflict = False
+                for tt in conflicts:
+                    # Overlap if: new_start < tt.end_time AND tt.start_time < new_end
+                    if new_start < tt.end_time and tt.start_time < new_end:
+                        has_conflict = True
+                        break
+                
+                if has_conflict:
+                    flash('This room is already booked for the selected time slot.', 'error')
+                else:
+                    tt = Timetable(
+                        room_id=room_id,
+                        faculty_id=faculty_id,
+                        subject=subject,
+                        day_of_week=day_of_week,
+                        start_time=new_start,
+                        end_time=new_end
+                    )
+                    db.session.add(tt)
+                    db.session.commit()
+                    flash('Timetable entry added successfully!', 'success')
+                    return redirect(url_for('admin.timetable'))
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error adding timetable: {str(e)}', 'error')
+
+    # GET: Fetch data for the form and list
+    rooms = Room.query.filter(Room.room_type.in_(['class', 'lab'])).order_by(Room.number).all()
+    faculty = User.query.filter_by(role=User.ROLE_FACULTY).order_by(User.name).all()
+    
+    # Filter by room or faculty if provided
+    filter_room = request.args.get('room_id')
+    filter_faculty = request.args.get('faculty_id')
+    
+    query = Timetable.query
+    if filter_room:
+        query = query.filter_by(room_id=filter_room)
+    if filter_faculty:
+        query = query.filter_by(faculty_id=filter_faculty)
+        
+    timetables = query.order_by(Timetable.day_of_week, Timetable.start_time).all()
+    
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    
+    return render_template('admin/timetable.html',
+                         rooms=rooms,
+                         faculty=faculty,
+                         timetables=timetables,
+                         days=days,
+                         filter_room=filter_room,
+                         filter_faculty=filter_faculty)
+
+
+@admin_bp.route('/timetable/<int:tt_id>/delete', methods=['POST'])
+@admin_required
+def delete_timetable(tt_id):
+    """Delete a timetable entry."""
+    from ...models import Timetable
+    tt = Timetable.query.get_or_404(tt_id)
+    db.session.delete(tt)
+    db.session.commit()
+    flash('Timetable entry removed.', 'success')
+    return redirect(url_for('admin.timetable'))

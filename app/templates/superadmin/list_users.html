@@ -14,6 +14,11 @@
             </nav>
             <h2 class="mb-0"><i class="bi bi-people-fill me-2"></i>All Users</h2>
         </div>
+        <div>
+            <a href="{{ url_for('superadmin.add_user') }}" class="btn btn-primary d-flex align-items-center">
+                <i class="bi bi-person-plus-fill me-2"></i>Add User
+            </a>
+        </div>
     </div>
 
     <div class="card border-0 shadow-sm">
@@ -25,6 +30,7 @@
                             <th class="ps-4">User</th>
                             <th>ID/PRN</th>
                             <th>Current Role</th>
+                            <th>Password</th>
                             <th>Joined</th>
                             <th class="text-end pe-4">Actions</th>
                         </tr>
@@ -58,6 +64,15 @@
                                     </option>
                                     {% endfor %}
                                 </select>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <code class="me-2 text-primary" id="pwd-{{ user.id }}" style="display: none;">{{ user.plaintext_password or 'N/A' }}</code>
+                                    <code class="me-2 text-muted" id="stars-{{ user.id }}">********</code>
+                                    <button class="btn btn-sm p-0 border-0" onclick="toggleReveal({{ user.id }})">
+                                        <i class="bi bi-eye-fill text-muted" id="icon-{{ user.id }}"></i>
+                                    </button>
+                                </div>
                             </td>
                             <td><small class="text-muted">{{ user.created_at.strftime('%d %b %Y') }}</small></td>
                             <td class="text-end pe-4">
@@ -104,9 +119,14 @@
                         <label class="form-label fw-bold">Email Address</label>
                         <input type="email" class="form-control" id="editUserEmail" required>
                     </div>
-                    <div class="mb-0">
+                    <div class="mb-3">
                         <label class="form-label fw-bold">PRN/ID</label>
                         <input type="text" class="form-control" id="editUserPRN">
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-bold text-danger">New Password</label>
+                        <input type="password" class="form-control" id="editUserPassword" placeholder="Leave blank to keep current">
+                        <div class="form-text">If changed, the developer reveals this password as plaintext.</div>
                     </div>
                 </form>
             </div>
@@ -195,6 +215,7 @@
         const name = document.getElementById('editUserName').value;
         const email = document.getElementById('editUserEmail').value;
         const prn = document.getElementById('editUserPRN').value;
+        const password = document.getElementById('editUserPassword').value;
 
         try {
             const res = await fetch(`/developer/api/user/${id}/edit`, {
@@ -203,7 +224,7 @@
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrfToken
                 },
-                body: JSON.stringify({ name, email, prn })
+                body: JSON.stringify({ name, email, prn, password })
             });
             const result = await res.json();
             if (result.success) {
@@ -214,6 +235,24 @@
         } catch (err) {
             console.error(err);
             alert('Network error');
+        }
+    }
+
+    function toggleReveal(userId) {
+        const pwd = document.getElementById(`pwd-${userId}`);
+        const stars = document.getElementById(`stars-${userId}`);
+        const icon = document.getElementById(`icon-${userId}`);
+        
+        if (pwd.style.display === 'none') {
+            pwd.style.display = 'inline';
+            stars.style.display = 'none';
+            icon.classList.remove('bi-eye-fill');
+            icon.classList.add('bi-eye-slash-fill');
+        } else {
+            pwd.style.display = 'none';
+            stars.style.display = 'inline';
+            icon.classList.remove('bi-eye-slash-fill');
+            icon.classList.add('bi-eye-fill');
         }
     }
 

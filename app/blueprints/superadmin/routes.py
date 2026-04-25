@@ -66,13 +66,14 @@ def logout():
 @super_admin_required
 def dashboard():
     """Developer dashboard - manage admins and professionals."""
-    # Get counts
-    admin_count = User.query.filter_by(is_admin=True).count()
+    admin_count = User.query.filter_by(is_admin=True, role=User.ROLE_ADMIN).count()
+    faculty_count = User.query.filter_by(role=User.ROLE_FACULTY).count()
     professional_count = Professional.query.filter_by(is_active=True).count()
     user_count = User.query.count()
     
     return render_template('superadmin/dashboard.html',
                          admin_count=admin_count,
+                         faculty_count=faculty_count,
                          professional_count=professional_count,
                          user_count=user_count)
 
@@ -81,58 +82,68 @@ def dashboard():
 @super_admin_required
 def list_users():
     """List all registered users for management."""
-    users = User.query.order_by(User.created_at.desc()).all()
-    return render_template('superadmin/list_users.html', users=users, roles=User.ROLES)
+    role_filter = request.args.get('role')
+    query = User.query
+    if role_filter:
+        query = query.filter_by(role=role_filter)
+    
+    users = query.order_by(User.created_at.desc()).all()
+    return render_template('superadmin/list_users.html', users=users, roles=User.ROLES, current_role=role_filter)
 
 
 # ==================== ADD NEW ADMIN ====================
 
-@superadmin_bp.route('/developer/add-admin', methods=['GET', 'POST'])
+@superadmin_bp.route('/developer/add-user', methods=['GET', 'POST'])
 @super_admin_required
-def add_admin():
-    """Add a new admin user."""
+def add_user():
+    """Add a new user (Student, Faculty, or Admin)."""
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '').strip()
+        role = request.form.get('role', User.ROLE_STUDENT).strip()
+        prn = request.form.get('prn', '').strip() or None
         
         # Validation
         errors = []
-        if not name:
-            errors.append('Name is required')
-        if not email:
-            errors.append('Email is required')
-        if not password or len(password) < 8:
-            errors.append('Password must be at least 8 characters')
+        if not name: errors.append('Name is required')
+        if not email: errors.append('Email is required')
+        if not password or len(password) < 8: errors.append('Password must be at least 8 characters')
+        if role not in User.ROLES: errors.append('Invalid role')
         
-        # Check if email exists
         if User.query.filter_by(email=email).first():
             errors.append('An account with this email already exists')
         
         if errors:
-            for error in errors:
-                flash(error, 'error')
-            return render_template('superadmin/add_admin.html', form_data=request.form)
-        
+            for error in errors: flash(error, 'error')
+            return render_template('superadmin/add_user.html', roles=User.ROLES, form_data=request.form)
+            
         try:
-            admin_user = User(
+            user = User(
                 name=name,
                 email=email,
-                role=User.ROLE_ADMIN,
-                is_admin=True,
+                role=role,
+                prn=prn,
+                is_admin=(role == User.ROLE_ADMIN),
                 is_verified=True
             )
-            admin_user.set_password(password)
-            db.session.add(admin_user)
+            user.set_password(password)
+            db.session.add(user)
             db.session.commit()
             
-            flash(f'Admin {name} created successfully!', 'success')
-            return redirect(url_for('superadmin.dashboard'))
+            flash(f'User {name} ({role}) created successfully!', 'success')
+            return redirect(url_for('superadmin.list_users'))
         except Exception as e:
             db.session.rollback()
-            flash(f'Error creating admin: {str(e)}', 'error')
-    
-    return render_template('superadmin/add_admin.html')
+            flash(f'Error creating user: {str(e)}', 'error')
+            
+    return render_template('superadmin/add_user.html', roles=User.ROLES)
+
+@superadmin_bp.route('/developer/add-admin', methods=['GET', 'POST'])
+@super_admin_required
+def add_admin():
+    """Redirect to new add-user route."""
+    return redirect(url_for('superadmin.add_user'))
 
 
 # ==================== ADD NEW PROFESSIONAL (Job Certified) ====================
@@ -419,7 +430,7 @@ def update_user_role(user_id):
 @superadmin_bp.route('/developer/api/user/<int:user_id>/edit', methods=['POST'])
 @super_admin_required
 def edit_user_details(user_id):
-    """Edit user details."""
+    """Edit user details including password."""
     from ...api_utils import api_response, validate_json
     user = User.query.get_or_404(user_id)
     data, error = validate_json(['name', 'email'])
@@ -429,6 +440,13 @@ def edit_user_details(user_id):
         user.name = data.get('name')
         user.email = data.get('email').lower()
         user.prn = data.get('prn')
+        
+        # Update password if provided
+        password = data.get('password')
+        if password:
+            if len(password) < 8:
+                return api_response(success=False, error="Password must be at least 8 characters", status=400)
+            user.set_password(password)
         
         db.session.commit()
         return api_response(message="User details updated", data={'user': user.to_dict()})

@@ -1,0 +1,524 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Timetable - Admin Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .timetable-container {
+        padding-bottom: 50px;
+    }
+    
+    .form-card {
+        background: var(--card-bg);
+        border-radius: 20px;
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+        margin-bottom: 30px;
+    }
+    
+    .form-header {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        padding: 20px 30px;
+        color: white;
+    }
+    
+    .form-body {
+        padding: 30px;
+    }
+    
+    .btn-group-slots {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .slot-btn {
+        border: 1px solid var(--border-color);
+        background: var(--bg-light);
+        padding: 10px;
+        border-radius: 10px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 500;
+    }
+    
+    .slot-btn:hover {
+        background: #e9ecef;
+        border-color: #adb5bd;
+    }
+    
+    .slot-btn.active {
+        background: #0d6efd;
+        color: white;
+        border-color: #0d6efd;
+        box-shadow: 0 4px 10px rgba(13, 110, 253, 0.3);
+    }
+    
+    .duration-group {
+        display: flex;
+        gap: 15px;
+    }
+    
+    .duration-btn {
+        flex: 1;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-light);
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+        font-weight: 600;
+    }
+    
+    .duration-btn.active {
+        background: #198754;
+        color: white;
+        border-color: #198754;
+        box-shadow: 0 4px 10px rgba(25, 135, 84, 0.3);
+    }
+    
+    .day-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .day-btn {
+        padding: 8px 15px;
+        border-radius: 30px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-light);
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.9rem;
+    }
+    
+    .day-btn.active {
+        background: #6f42c1;
+        color: white;
+        border-color: #6f42c1;
+    }
+    
+    .timetable-list-card {
+        background: var(--card-bg);
+        border-radius: 20px;
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .tt-item {
+        padding: 15px 25px;
+        border-bottom: 1px solid var(--border-color);
+        transition: background 0.2s;
+    }
+    
+    .tt-item:last-child {
+        border-bottom: none;
+    }
+    
+    .tt-item:hover {
+        background: rgba(0,0,0,0.02);
+    }
+    
+    .tt-time {
+        font-weight: 700;
+        color: #0d6efd;
+        font-size: 1.1rem;
+    }
+    
+    .tt-day {
+        color: #6f42c1;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .tt-subject {
+        font-weight: 600;
+        font-size: 1.05rem;
+    }
+    
+    .tt-room {
+        background: #f8f9fa;
+        padding: 2px 10px;
+        border-radius: 5px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .delete-tt-btn {
+        opacity: 0.3;
+        transition: opacity 0.2s;
+    }
+    
+    .tt-item:hover .delete-tt-btn {
+        opacity: 1;
+    }
+
+    [data-theme="dark"] .slot-btn, 
+    [data-theme="dark"] .duration-btn,
+    [data-theme="dark"] .day-btn {
+        background: #2d2d2d;
+        border-color: #444;
+        color: #eee;
+    }
+    
+    [data-theme="dark"] .tt-room {
+        background: #333;
+        color: #ddd;
+    }
+
+    /* Smart Room Selector Styles */
+    .room-selector-container {
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        background: var(--bg-light);
+        overflow: hidden;
+    }
+    
+    .room-search-wrapper {
+        padding: 15px;
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .floor-tabs-wrapper {
+        display: flex;
+        overflow-x: auto;
+        padding: 10px;
+        gap: 8px;
+        background: rgba(0,0,0,0.02);
+        border-bottom: 1px solid var(--border-color);
+        scrollbar-width: none;
+    }
+    
+    .floor-tabs-wrapper::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .floor-tab {
+        padding: 6px 15px;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.2s;
+    }
+    
+    .floor-tab.active {
+        background: var(--mitwpu-blue);
+        color: white;
+        border-color: var(--mitwpu-blue);
+    }
+    
+    .rooms-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 10px;
+        padding: 15px;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .room-tile {
+        padding: 10px 5px;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    
+    .room-tile:hover {
+        border-color: var(--mitwpu-blue);
+        background: rgba(var(--mitwpu-blue-rgb), 0.05);
+    }
+    
+    .room-tile.active {
+        background: var(--mitwpu-blue);
+        color: white;
+        border-color: var(--mitwpu-blue);
+        box-shadow: 0 4px 8px rgba(var(--mitwpu-blue-rgb), 0.3);
+    }
+    
+    .selected-room-info {
+        padding: 10px 15px;
+        background: rgba(25, 135, 84, 0.1);
+        border-top: 1px solid rgba(25, 135, 84, 0.2);
+        color: #198754;
+        font-weight: 600;
+        font-size: 0.9rem;
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container timetable-container mt-4">
+    <div class="row">
+        <div class="col-lg-5">
+            <div class="form-card fade-in">
+                <div class="form-header">
+                    <h4 class="mb-0"><i class="bi bi-calendar-plus me-2"></i>Add Timetable Entry</h4>
+                </div>
+                <div class="form-body">
+                    <form id="timetableForm" method="POST" action="{{ url_for('admin.timetable') }}">
+                        <input type="hidden" name="day_of_week" id="day_input" value="0">
+                        <input type="hidden" name="start_hour" id="hour_input" value="8">
+                        <input type="hidden" name="duration" id="duration_input" value="1">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">1. Select Classroom</label>
+                            <input type="hidden" name="room_id" id="room_id_input" required>
+                            <div class="room-selector-container shadow-sm">
+                                <div class="room-search-wrapper">
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search"></i></span>
+                                        <input type="text" id="roomSearch" class="form-control border-start-0" placeholder="Search room number...">
+                                    </div>
+                                </div>
+                                
+                                <div class="floor-tabs-wrapper" id="floorTabs">
+                                    <div class="floor-tab active" data-floor="all">All Floors</div>
+                                    <div class="floor-tab" data-floor="0">Ground</div>
+                                    <div class="floor-tab" data-floor="1">1st Floor</div>
+                                    <div class="floor-tab" data-floor="2">2nd Floor</div>
+                                    <div class="floor-tab" data-floor="3">3rd Floor</div>
+                                    <div class="floor-tab" data-floor="4">4th Floor</div>
+                                </div>
+                                
+                                <div class="rooms-grid" id="roomsGrid">
+                                    {% for room in rooms %}
+                                    <div class="room-tile" 
+                                         data-id="{{ room.id }}" 
+                                         data-number="{{ room.number }}" 
+                                         data-floor="{{ room.number[2] if room.number|length > 2 else '0' }}">
+                                        {{ room.number }}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                
+                                <div class="selected-room-info" id="selectedRoomInfo">
+                                    <i class="bi bi-check-circle-fill me-2"></i>Selected: <span id="selectedRoomName">None</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">2. Select Faculty</label>
+                            <select name="faculty_id" class="form-select form-select-lg shadow-sm" required>
+                                <option value="" disabled selected>Assign faculty...</option>
+                                {% for f in faculty %}
+                                <option value="{{ f.id }}">{{ f.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">3. Subject / Lecture Name</label>
+                            <input type="text" name="subject" class="form-control form-control-lg shadow-sm" placeholder="e.g. Data Structures" required>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">4. Select Day</label>
+                            <div class="day-group">
+                                {% for day in days %}
+                                <div class="day-btn {% if loop.index0 == 0 %}active{% endif %}" data-value="{{ loop.index0 }}">
+                                    {{ day }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">5. Start Time Slot</label>
+                            <div class="btn-group-slots">
+                                {% for h in range(6, 22) %}
+                                    {% set display_h = h if h <= 12 else h - 12 %}
+                                    {% set period = "AM" if h < 12 else "PM" %}
+                                    <div class="slot-btn {% if h == 8 %}active{% endif %}" data-value="{{ h }}">
+                                        {{ display_h }} {{ period }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">6. Duration</label>
+                            <div class="duration-group">
+                                <div class="duration-btn active" data-value="1">1 Hour</div>
+                                <div class="duration-btn" data-value="2">2 Hours</div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg w-100 shadow mt-2">
+                            <i class="bi bi-cloud-upload me-2"></i>Save to Calendar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="mb-0"><i class="bi bi-list-task me-2"></i>Active Timetables</h3>
+                <div class="d-flex gap-2">
+                    <select class="form-select form-select-sm" id="roomFilter" onchange="applyFilters()">
+                        <option value="">All Rooms</option>
+                        {% for room in rooms %}
+                        <option value="{{ room.id }}" {% if filter_room == room.id|string %}selected{% endif %}>{{ room.number }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="timetable-list-card fade-in">
+                {% if timetables %}
+                    <div class="list-container">
+                        {% for tt in timetables %}
+                        <div class="tt-item d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-4">
+                                <div class="text-center" style="min-width: 100px;">
+                                    <div class="tt-day">{{ days[tt.day_of_week] }}</div>
+                                    <div class="tt-time">{{ tt.start_time.strftime('%I:%M %p') }}</div>
+                                    <div class="small text-muted">to {{ tt.end_time.strftime('%I:%M %p') }}</div>
+                                </div>
+                                <div>
+                                    <div class="tt-subject">{{ tt.subject }}</div>
+                                    <div class="d-flex gap-2 mt-1 align-items-center">
+                                        <span class="tt-room"><i class="bi bi-door-open me-1"></i>{{ tt.room.number }}</span>
+                                        <span class="text-muted small"><i class="bi bi-person me-1"></i>{{ tt.faculty.name }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <form method="POST" action="{{ url_for('admin.delete_timetable', tt_id=tt.id) }}" onsubmit="return confirm('Remove this schedule?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-link text-danger delete-tt-btn p-0">
+                                    <i class="bi bi-trash fs-5"></i>
+                                </button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-calendar-x display-1 text-muted opacity-25"></i>
+                        <p class="mt-3 text-muted">No entries found for selected filters.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Day selector
+        const dayBtns = document.querySelectorAll('.day-btn');
+        const dayInput = document.getElementById('day_input');
+        
+        dayBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                dayBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                dayInput.value = btn.dataset.value;
+            });
+        });
+        
+        // Slot selector
+        const slotBtns = document.querySelectorAll('.slot-btn');
+        const hourInput = document.getElementById('hour_input');
+        
+        slotBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                slotBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                hourInput.value = btn.dataset.value;
+            });
+        });
+        
+        // Duration selector
+        const durationBtns = document.querySelectorAll('.duration-btn');
+        const durationInput = document.getElementById('duration_input');
+        
+        durationBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                durationBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                durationInput.value = btn.dataset.value;
+            });
+        });
+
+        // --- Smart Room Selector Logic ---
+        const roomTiles = document.querySelectorAll('.room-tile');
+        const roomIdInput = document.getElementById('room_id_input');
+        const roomSearch = document.getElementById('roomSearch');
+        const floorTabs = document.querySelectorAll('.floor-tab');
+        const selectedRoomInfo = document.getElementById('selectedRoomInfo');
+        const selectedRoomName = document.getElementById('selectedRoomName');
+
+        function filterRooms() {
+            const searchTerm = roomSearch.value.toLowerCase();
+            const activeFloor = document.querySelector('.floor-tab.active').dataset.floor;
+
+            roomTiles.forEach(tile => {
+                const roomNum = tile.dataset.number.toLowerCase();
+                const roomFloor = tile.dataset.floor;
+                
+                const matchesSearch = roomNum.includes(searchTerm);
+                const matchesFloor = activeFloor === 'all' || roomFloor === activeFloor;
+
+                if (matchesSearch && matchesFloor) {
+                    tile.style.display = 'block';
+                } else {
+                    tile.style.display = 'none';
+                }
+            });
+        }
+
+        roomTiles.forEach(tile => {
+            tile.addEventListener('click', () => {
+                roomTiles.forEach(t => t.classList.remove('active'));
+                tile.classList.add('active');
+                roomIdInput.value = tile.dataset.id;
+                
+                // Update selection UI
+                selectedRoomInfo.style.display = 'block';
+                selectedRoomName.textContent = tile.dataset.number;
+            });
+        });
+
+        roomSearch.addEventListener('input', filterRooms);
+
+        floorTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                floorTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                filterRooms();
+            });
+        });
+    });
+    
+    function applyFilters() {
+        const roomId = document.getElementById('roomFilter').value;
+        const url = new URL(window.location.href);
+        if (roomId) url.searchParams.set('room_id', roomId);
+        else url.searchParams.delete('room_id');
+        window.location.href = url.toString();
+    }
+</script>
+{% endblock %}

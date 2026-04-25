@@ -1,0 +1,948 @@
+{% extends "base.html" %}
+
+{% block title %}Faculty Dashboard - MIT-WPU Vyas Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    .faculty-dashboard {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+    
+    .nav-pills .nav-link {
+        color: var(--text-color);
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        font-weight: 500;
+    }
+    
+    .nav-pills .nav-link.active {
+        background-color: var(--mitwpu-blue);
+        color: white;
+        box-shadow: 0 4px 10px rgba(0, 114, 198, 0.3);
+    }
+    
+    .schedule-card {
+        border-radius: 12px;
+        border: none;
+        background: var(--card-bg);
+        box-shadow: var(--shadow-md);
+        transition: transform 0.3s ease;
+    }
+    
+    .schedule-card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .room-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+    
+    .room-card {
+        border-radius: 12px;
+        padding: 15px;
+        text-align: center;
+        background: var(--card-bg);
+        box-shadow: var(--shadow-sm);
+        border-left: 5px solid transparent;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 120px;
+    }
+    
+    .room-card:hover {
+        transform: scale(1.02);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .room-card.occupied {
+        border-left-color: var(--danger-color);
+    }
+    
+    .room-card.vacant {
+        border-left-color: var(--success-color);
+    }
+    
+    .room-badge {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        border-radius: 20px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        display: inline-block;
+    }
+    
+    .badge-occupied { background-color: rgba(220, 53, 69, 0.1); color: var(--danger-color); }
+    .badge-vacant { background-color: rgba(40, 167, 69, 0.1); color: var(--success-color); }
+    
+    .room-number {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text-color);
+    }
+    
+    .room-details {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-top: 5px;
+    }
+
+    /* Cyberpunk / Glassmorphism Additions */
+    :root {
+        --glass-bg: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --cyber-blue: #00f2ff;
+        --cyber-pink: #ff00ff;
+        --cyber-green: #20c997;
+    }
+
+    .glass-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    .map-container {
+        position: relative;
+        width: 100%;
+        max-width: 1000px;
+        margin: 0 auto;
+        overflow: hidden;
+        border-radius: 20px;
+        background: rgba(0,0,0,0.2);
+        border: 1px solid var(--glass-border);
+    }
+
+    #roomDetailsPanel {
+        height: auto;
+        min-height: 300px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+    }
+
+    /* Map Expansive Mode */
+    .map-container {
+        min-height: 800px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
+        position: relative;
+        padding: 40px;
+        margin-bottom: 30px;
+    }
+
+    .svg-container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 10px;
+    }
+
+    .svg-container svg {
+        max-height: 100%;
+        max-width: 100%;
+        height: auto;
+        width: auto;
+        display: block;
+        margin: auto;
+        filter: drop-shadow(0 0 20px rgba(0,0,0,0.2));
+    }
+
+    .vyas-floor-map {
+        height: 100%;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .room-poly {
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .room-disabled {
+        cursor: default !important;
+        pointer-events: none !important;
+        opacity: 0.8;
+    }
+
+    .room-disabled rect {
+        fill: #333 !important;
+    }
+
+    .facility-intelligence-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .status-legend {
+        display: flex;
+        gap: 15px;
+        font-size: 0.85rem;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+
+    .dot.available { background: var(--mitwpu-green); box-shadow: 0 0 8px var(--mitwpu-green); }
+    .dot.occupied { background: var(--mitwpu-orange); box-shadow: 0 0 8px var(--mitwpu-orange); }
+    .dot.selected { background: #fff; box-shadow: 0 0 8px #fff; }
+
+    /* Static Floating Pop-up - Locked to Side */
+    #roomPopUp {
+        position: fixed !important;
+        top: 100px !important;
+        right: 30px !important;
+        left: auto !important;
+        transform: none !important;
+        z-index: 1050;
+        width: 380px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: none;
+    }
+    
+    #roomPopUp .pop-card {
+        pointer-events: auto;
+    }
+
+    .pop-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    [data-theme="dark"] .pop-card {
+        background: rgba(20, 20, 20, 0.95);
+    }
+
+    .pop-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .pop-body {
+        padding: 25px;
+    }
+
+    .pop-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin-bottom: 2px;
+    }
+
+    .pop-subtitle {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        letter-spacing: 1px;
+        font-weight: 600;
+    }
+
+    .pop-badge {
+        font-size: 0.7rem;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .pop-badge.vacant { background: rgba(46, 213, 115, 0.1); color: #2ed573; }
+    .pop-badge.occupied { background: rgba(255, 71, 87, 0.1); color: #ff4757; }
+    .pop-badge.issue { background: rgba(255, 107, 129, 0.1); color: #ff6b81; }
+
+    .pop-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 25px;
+    }
+
+    .action-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        transition: all 0.2s ease;
+        color: white;
+    }
+
+    .action-btn:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    .action-btn.btn-book { background: #2f3542; }
+    .action-btn.btn-success { background: #2ed573; }
+    .action-btn.btn-cancel { background: #ff4757; }
+    .action-btn.btn-location { background: #3498db; }
+
+    .status-alert {
+        background: rgba(255, 71, 87, 0.05);
+        border-radius: 12px;
+        padding: 15px;
+        margin-top: 20px;
+        border-left: 4px solid #ff4757;
+    }
+
+    .status-alert.vacant {
+        background: rgba(46, 213, 115, 0.05);
+        border-left-color: #2ed573;
+    }
+    .glass-modal .modal-content {
+        background: rgba(15, 22, 36, 0.85);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: white;
+    }
+
+    .glass-modal .modal-header { border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .glass-modal .form-control, .glass-modal .form-select {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: white;
+    }
+    .glass-modal .form-control:focus {
+        background: rgba(255,255,255,0.1);
+        border-color: var(--cyber-blue);
+        box-shadow: 0 0 0 0.25rem rgba(0, 242, 255, 0.25);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container faculty-dashboard mb-2">
+    <div class="row mb-3 align-items-center">
+        <div class="col-md-6">
+            <h2 class="mb-1 fw-bold">Welcome, {{ faculty.name }}</h2>
+            <p class="text-muted mb-0">Manage your schedule and claim vacant rooms instantly.</p>
+        </div>
+        <div class="col-md-6 text-md-end mt-3 mt-md-0">
+            <ul class="nav nav-pills justify-content-md-end" id="dashboard-tabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active me-2" id="btn-schedule" type="button" role="tab">
+                        <i class="bi bi-calendar-event me-2"></i>My Schedule
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="btn-tracker" type="button" role="tab">
+                        <i class="bi bi-building me-2"></i>Room Tracker
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Section: My Schedule -->
+    <div id="view-schedule" class="view-section active">
+        <div class="row">
+            <div class="col-12">
+                <div class="card schedule-card p-4">
+                    <h4 class="mb-4"><i class="bi bi-calendar3 me-2"></i>Upcoming Classes</h4>
+                    
+                    {% set days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
+                    
+                    {% if my_adhoc %}
+                    <h5 class="text-primary mt-3 mb-3">Active Ad-Hoc Bookings</h5>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Room</th>
+                                    <th>Subject</th>
+                                    <th>Date</th>
+                                    <th>Time Frame</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ad in my_adhoc %}
+                                <tr>
+                                    <td><strong>{{ ad.room.number }}</strong></td>
+                                    <td>{{ ad.subject }}</td>
+                                    <td>{{ ad.start_datetime.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        <span class="badge bg-primary rounded-pill">
+                                            {{ ad.start_datetime.strftime('%H:%M') }} - {{ ad.end_datetime.strftime('%H:%M') }} (UTC)
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between align-items-center mb-3 mt-4">
+                        <h5 class="text-primary mb-0">Weekly Regular Schedule</h5>
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#timetableModal">
+                            <i class="bi bi-upload me-2"></i>Sync Timetable
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Day</th>
+                                    <th>Room</th>
+                                    <th>Subject</th>
+                                    <th>Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if my_schedules %}
+                                    {% for sched in my_schedules %}
+                                    <tr class="{% if sched.day_of_week == current_day %}table-primary bg-opacity-10{% endif %}">
+                                        <td class="fw-semibold">{{ days[sched.day_of_week] }}</td>
+                                        <td><strong>{{ sched.room.number }}</strong></td>
+                                        <td>{{ sched.subject }}</td>
+                                        <td><i class="bi bi-clock me-1 text-muted"></i>{{ sched.start_time.strftime('%I:%M %p') }} - {{ sched.end_time.strftime('%I:%M %p') }}</td>
+                                        <td>
+                                            {% if sched.day_of_week == current_day %}
+                                            <span class="badge bg-primary">Today</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">Upcoming</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted">
+                                            <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>
+                                            No regular schedule assigned.
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section: Smart Classroom Management (SVG Map) -->
+    <div id="view-tracker" class="view-section">
+        <div class="facility-intelligence-header">
+            <div>
+                <h4 class="mb-1"><i class="bi bi-cpu me-2"></i>Smart Classroom Management</h4>
+                <p class="text-muted small">Real-time room occupancy and automated faculty scheduling.</p>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <div class="status-legend me-3">
+                    <div class="legend-item"><span class="dot available"></span> Available</div>
+                    <div class="legend-item"><span class="dot occupied"></span> Occupied</div>
+                </div>
+                <select class="form-select w-auto glass-card border-0 text-white" id="floorSelectorMap" style="background-color: var(--mitwpu-blue);">
+                    {% for floor in floors %}
+                        <option value="{{ floor.level }}" data-floor-id="{{ floor.id }}" {% if floor.level == 4 %}selected{% endif %}>
+                            {{ floor.name }} {% if floor.level == 4 %}(Interactive){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="facultyMapContainer" class="svg-container">
+                <div class="text-center py-5 text-muted">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <p>Accessing Floor Schematics...</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Static Floating Pop-up Moved to Root of Content -->
+<div id="roomPopUp">
+    <div class="pop-card">
+        <div class="pop-header">
+            <div class="pop-title" id="popRoomNumber">VY402</div>
+            <button type="button" class="btn-close" onclick="closePopUp()"></button>
+        </div>
+        <div class="pop-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <div class="pop-title" id="popRoomName">Programming Lab</div>
+                    <div class="pop-subtitle" id="popRoomType">LAB</div>
+                </div>
+                <div id="popStatusBadge" class="pop-badge vacant">VACANT</div>
+            </div>
+
+            <div class="pop-actions">
+                <button class="btn btn-primary w-100 fw-bold py-2" id="btnActionBook" onclick="window.triggerBookingModal()">
+                    <i class="bi bi-calendar-plus me-2"></i>Book Class
+                </button>
+                <button class="btn btn-outline-danger w-100 fw-bold py-2 d-none" id="btnActionCancel">
+                    <i class="bi bi-trash3 me-2"></i>Cancel Session
+                </button>
+            </div>
+
+            <div id="popStatusAlert" class="status-alert vacant">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    <strong id="popAlertTitle">Needs Attention</strong>
+                </div>
+                <div id="popAlertContent">
+                    Room is currently vacant. Energy levels optimal.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Timetable Sync Modal -->
+<div class="modal fade glass-modal" id="timetableModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Neural Timetable Synchronization</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Upload your weekly schedule to automate room reservations. The system will auto-reserve these slots for the current semester.</p>
+                <div class="mb-3">
+                    <label class="form-label">Raw Timetable Data (JSON/CSV Mapping)</label>
+                    <textarea class="form-control" id="timetableData" rows="6" placeholder='[{"room_id": 5, "day_of_week": 0, "start_time": "10:00", "subject": "Data Structures"}]'></textarea>
+                </div>
+                <button class="btn btn-primary w-100" id="btnSyncTimetable">UPLOAD TO MAINFRAME</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Booking Modal (Glassmorphism) -->
+<div class="modal fade glass-modal" id="bookingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i>Module Slot Booking</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="bookingForm">
+                    <input type="hidden" id="bookRoomId">
+                    <div class="mb-3">
+                        <label class="form-label">Select Start Time (Today)</label>
+                        <select class="form-select" id="bookSlotStart">
+                            <!-- Dynamic Slots -->
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Duration</label>
+                        <select class="form-select" id="bookDuration">
+                            <option value="1">1 Hour</option>
+                            <option value="2">2 Hours (Max)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Lecture / Meeting Subject</label>
+                        <input type="text" class="form-control" id="bookSubject" placeholder="Enter subject..." required>
+                    </div>
+
+                    <div class="alert alert-info py-2 small bg-opacity-10 border-info">
+                        <i class="bi bi-info-circle me-2"></i>Slots are reserved in 1-hour or 2-hour increments.
+                    </div>
+
+                    <button type="submit" class="btn btn-info w-100 py-2 fw-bold text-white shadow-sm" id="btnConfirmBooking">
+                        DEPLOY ASSIGNMENT
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+    <!-- Add SweetAlert2 for nice alerts -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Include Pusher -->
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+
+    <script type="module">
+        import { renderFloorMap } from "{{ url_for('static', filename='js/modules/render.js') }}";
+
+        document.addEventListener('DOMContentLoaded', () => {
+            let currentStatusData = {};
+            let selectedRoomId = null;
+
+            // Pre-initialize modals
+            const bookingModal = new bootstrap.Modal(document.getElementById('bookingModal'));
+            const timetableModal = new bootstrap.Modal(document.getElementById('timetableModal'));
+
+            // Setup GSAP View Switching
+            const btnSchedule = document.getElementById('btn-schedule');
+            const btnTracker = document.getElementById('btn-tracker');
+            const viewSchedule = document.getElementById('view-schedule');
+            const viewTracker = document.getElementById('view-tracker');
+            
+            gsap.set(viewTracker, { display: 'none', opacity: 0 });
+            
+            function switchView(fromView, toView, btnActive, btnInactive) {
+                if (fromView === toView || toView.classList.contains('active')) return;
+                
+                btnActive.classList.add('active');
+                btnInactive.classList.remove('active');
+                
+                gsap.to(fromView, {
+                    opacity: 0, duration: 0.3, ease: "power2.inOut",
+                    onComplete: () => {
+                        fromView.style.display = 'none';
+                        fromView.classList.remove('active');
+                        toView.style.display = 'block';
+                        toView.classList.add('active');
+                        gsap.fromTo(toView, { opacity: 0, y: 15 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" });
+                    }
+                });
+            }
+
+            btnSchedule.addEventListener('click', () => {
+                switchView(viewTracker, viewSchedule, btnSchedule, btnTracker);
+            });
+            
+            btnTracker.addEventListener('click', () => {
+                switchView(viewSchedule, viewTracker, btnTracker, btnSchedule);
+                // Initialize Map only on first click or forcefully refresh
+                if (!window.mapInitialized) {
+                    refreshMapStatus(4);
+                    window.mapInitialized = true;
+                }
+            });
+
+            // Export to window for SVG clicks
+            window.selectRoom = (event, roomNumber, roomId) => {
+                handleRoomSelection(event, roomNumber, roomId);
+            };
+
+            window.closePopUp = () => {
+                gsap.to('#roomPopUp', { opacity: 0, x: 50, duration: 0.2, onComplete: () => {
+                    document.getElementById('roomPopUp').style.display = 'none';
+                }});
+            };
+
+            // Dynamic Floor Selection
+            const floorSelect = document.getElementById('floorSelectorMap');
+            floorSelect.addEventListener('change', (e) => {
+                const level = e.target.value;
+                refreshMapStatus(level);
+            });
+
+            async function refreshMapStatus(floorLevel) {
+                const container = document.getElementById('facultyMapContainer');
+                const selectedOption = floorSelect.options[floorSelect.selectedIndex];
+                const floorId = selectedOption.getAttribute('data-floor-id');
+                
+                try {
+                    const res = await fetch(`/faculty/api/map/status/${floorId}`); 
+                    const result = await res.json();
+                    
+                    if (result.success) {
+                        const rooms = result.data.rooms;
+                        currentStatusData = {};
+                        rooms.forEach(r => currentStatusData[r.id] = r);
+                        
+                        container.innerHTML = '';
+                        renderFloorMap(container, rooms, floorLevel.toString(), false);
+                        
+                        // Apply custom "Facility Intelligence" colors
+                        applyOccupancyStyling();
+                    }
+                } catch (err) {
+                    console.error("Map Status Error:", err);
+                }
+            }
+
+            function applyOccupancyStyling() {
+                Object.values(currentStatusData).forEach(room => {
+                    const el = document.querySelector(`g[data-room-id="${room.id}"] rect`);
+                    if (el) {
+                        const occ = room.occupancy || { status: 'vacant' };
+                        if (occ.status === 'occupied') {
+                            el.classList.add('occupied-status');
+                            el.classList.remove('vacant-status');
+                        } else {
+                            el.classList.add('vacant-status');
+                            el.classList.remove('occupied-status');
+                        }
+                    }
+                });
+            }
+
+            function handleRoomSelection(event, roomNumber, roomId) {
+                selectedRoomId = roomId;
+                const info = currentStatusData[roomId];
+                if (!info) return;
+
+                // Highlight selection
+                document.querySelectorAll('.room-group, rect').forEach(r => r.classList.remove('selected'));
+                const group = document.querySelector(`g[data-room-id="${roomId}"]`);
+                if (group) {
+                    group.classList.add('selected');
+                    const rect = group.querySelector('rect');
+                    if (rect) rect.classList.add('selected');
+                }
+                
+                // Static Side Position
+                const pop = document.getElementById('roomPopUp');
+                pop.style.display = 'block';
+                gsap.fromTo(pop, { opacity: 0, x: 50 }, { opacity: 1, x: 0, duration: 0.3 });
+
+                document.getElementById('popRoomNumber').innerText = info.number;
+                document.getElementById('popRoomName').innerText = info.name || info.number;
+                document.getElementById('popRoomType').innerText = info.room_type || 'CLASSROOM';
+                
+                const occ = info.occupancy || { status: 'vacant' };
+                const bookBtn = document.getElementById('btnActionBook');
+                const badge = document.getElementById('popStatusBadge');
+                const alert = document.getElementById('popStatusAlert');
+                const cancelBtn = document.getElementById('btnActionCancel');
+
+                badge.className = `pop-badge ${occ.status}`;
+                badge.innerText = occ.status.toUpperCase();
+
+                if (occ.status === 'occupied') {
+                    alert.className = 'status-alert occupied';
+                    document.getElementById('popAlertTitle').innerText = 'In Session';
+                    // Always keep bookBtn active so they can book future slots
+                    bookBtn.classList.remove('disabled');
+                    bookBtn.removeAttribute('disabled');
+                    
+                    // Show a specific warning in the alert for occupied rooms
+                    document.getElementById('popAlertTitle').innerText = 'Currently In Session';
+                    document.getElementById('popAlertContent').innerHTML = `
+                        <strong>${occ.subject}</strong> - ${occ.faculty}<br>
+                        Ends at: ${occ.end_time}<br>
+                        <em>You can still book a future slot below.</em>
+                    `;
+                    
+                    if (occ.is_owner) {
+                        bookBtn.classList.add('d-none'); // Hide book if they already own it? No, maybe they want to book another slot.
+                        // Let's keep both if they want, but use hierarchy.
+                        // Actually, let's hide Book if they own the current hour to focus on Cancel.
+                        cancelBtn.classList.remove('d-none');
+                        cancelBtn.onclick = () => handleCancellation(occ.id, occ.type);
+                    } else {
+                        bookBtn.classList.remove('d-none');
+                        cancelBtn.classList.add('d-none');
+                    }
+                } else {
+                    alert.className = 'status-alert vacant';
+                    document.getElementById('popAlertTitle').innerText = 'Optimal Levels';
+                    document.getElementById('popAlertContent').innerHTML = 'Room is currently vacant. Access permitted.';
+                    bookBtn.classList.remove('disabled');
+                    bookBtn.removeAttribute('disabled');
+                    bookBtn.classList.remove('d-none');
+                    cancelBtn.classList.add('d-none');
+                }
+            }
+
+            async function handleCancellation(sessionId, type) {
+                const endpoint = type === 'booking' ? `/faculty/api/bookings/cancel/${sessionId}` : `/faculty/api/timetable/cancel/${sessionId}`;
+                const result = await Swal.fire({
+                    title: 'Confirm Cancellation',
+                    text: 'Are you sure you want to cancel this reservation?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, Cancel it'
+                });
+
+                if (result.isConfirmed) {
+                    try {
+                        const res = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content }
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            Swal.fire('Cancelled', data.message, 'success');
+                            closePopUp();
+                            refreshMapStatus(4);
+                        } else {
+                            Swal.fire('Error', data.error, 'error');
+                        }
+                    } catch (err) { console.error(err); }
+                }
+            }
+
+            window.triggerBookingModal = () => {
+                console.log("triggerBookingModal called. selectedRoomId:", selectedRoomId);
+                if (!selectedRoomId) {
+                    Swal.fire('Room Not Selected', 'Please click on a room in the map first.', 'info');
+                    return;
+                }
+                
+                const info = currentStatusData[selectedRoomId];
+                if (!info) {
+                    console.error("No data for room ID:", selectedRoomId);
+                    return;
+                }
+
+                const roomNumEl = document.getElementById('bookRoomNumber');
+                if (roomNumEl) roomNumEl.innerText = info.number;
+                
+                const roomIdEl = document.getElementById('bookRoomId');
+                if (roomIdEl) roomIdEl.value = selectedRoomId;
+                
+                // Populate Time Slots
+                const select = document.getElementById('bookSlotStart');
+                if (select) {
+                    select.innerHTML = '';
+                    const now = new Date();
+                    const currentHour = now.getHours();
+                    for (let h = currentHour; h <= 19; h++) {
+                        const timeStr = `${h.toString().padStart(2, '0')}:00`;
+                        const option = document.createElement('option');
+                        option.value = timeStr;
+                        option.innerText = `${h > 12 ? h-12 : h}:00 ${h >= 12 ? 'PM' : 'AM'}`;
+                        select.appendChild(option);
+                    }
+                }
+                
+                try {
+                    // Force a new instance if the stored one fails
+                    const el = document.getElementById('bookingModal');
+                    const inst = bootstrap.Modal.getOrCreateInstance(el);
+                    inst.show();
+                } catch (e) {
+                    console.error("Manual modal show failed:", e);
+                }
+            };
+
+            // Booking Form Submit
+            document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('btnConfirmBooking');
+                btn.disabled = true;
+
+                const slotTime = document.getElementById('bookSlotStart').value; // e.g. "14:00"
+                const now = new Date();
+                const [h, m] = slotTime.split(':');
+                now.setHours(h, 0, 0, 0);
+                
+                // Construct ISO string (YYYY-MM-DDTHH:MM:SS) for backend
+                const slotStart = now.getFullYear() + '-' + 
+                              String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                              String(now.getDate()).padStart(2, '0') + 'T' + 
+                              slotTime + ':00';
+
+                const payload = {
+                    room_id: document.getElementById('bookRoomId').value,
+                    subject: document.getElementById('bookSubject').value,
+                    duration: document.getElementById('bookDuration').value,
+                    slot_start: slotStart
+                };
+
+                try {
+                    const res = await fetch('/faculty/api/bookings/create', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        bookingModal.hide();
+                        Swal.fire({ icon: 'success', title: 'Slot Assigned', text: 'Facility AI has reserved your room.', timer: 2000, showConfirmButton: false });
+                        refreshMapStatus(4);
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Access Denied', text: result.error });
+                    }
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+
+            // Pusher Real-time integration
+            const pusherAppKey = "{{ config['PUSHER_KEY'] }}";
+            const pusherCluster = "{{ config['PUSHER_CLUSTER'] }}";
+            if (pusherAppKey && pusherAppKey !== 'dummy-key') {
+                const pusher = new Pusher(pusherAppKey, { cluster: pusherCluster });
+                const channel = pusher.subscribe('public-room-updates');
+                channel.bind('room_occupancy_changed', function(data) {
+                    refreshMapStatus(4);
+                });
+            }
+
+            // Timetable Sync
+            document.getElementById('btnSyncTimetable').addEventListener('click', async () => {
+                const rawData = document.getElementById('timetableData').value;
+                let data;
+                try {
+                    data = JSON.parse(rawData);
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Parse Error', text: 'Invalid JSON format.' });
+                    return;
+                }
+
+                const btn = document.getElementById('btnSyncTimetable');
+                btn.disabled = true;
+
+                try {
+                    const res = await fetch('/faculty/api/faculty/timetable', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        timetableModal.hide();
+                        Swal.fire({ icon: 'success', title: 'Sync Complete', text: result.message });
+                        location.reload();
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Sync Failed', text: result.error });
+                    }
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+        });
+    </script>
+{% endblock %}

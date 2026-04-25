@@ -1107,6 +1107,14 @@ body {
     fill: #0d6efd !important;
 }
 
+.room-poly.occupied-status {
+    fill: var(--mitwpu-orange) !important;
+}
+
+.room-poly.vacant-status {
+    fill: var(--mitwpu-green) !important;
+}
+
 .room-group.selected .room-text {
     font-weight: 800;
 }

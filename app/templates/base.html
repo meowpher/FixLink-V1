@@ -72,6 +72,7 @@
                                 <i class="bi bi-gear me-1"></i>Manage
                             </a>
                             <ul class="dropdown-menu shadow">
+                                <li><a class="dropdown-item" href="{{ url_for('admin.timetable') }}"><i class="bi bi-calendar-event me-2"></i>Timetable</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('admin.professionals') }}"><i class="bi bi-people me-2"></i>Professionals</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('admin.help_requests') }}"><i class="bi bi-hand-thumbs-up me-2"></i>Help Requests</a></li>
                                 <li><hr class="dropdown-divider"></li>
@@ -103,6 +104,14 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('professional.chat') }}">
                                 <i class="bi bi-chat-dots me-1"></i>Chat
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% if session.get('user_role') == 'faculty' or session.get('is_admin') %}
+                        <li class="nav-item">
+                            <a class="nav-link text-warning" href="{{ url_for('faculty.dashboard') }}">
+                                <i class="bi bi-calendar-check me-1"></i>Faculty Portal
                             </a>
                         </li>
                         {% endif %}

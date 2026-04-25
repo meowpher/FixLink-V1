@@ -125,12 +125,14 @@ def create_app(config_name=None):
     from .blueprints.auth import auth_bp
     from .blueprints.professional import professional_bp
     from .blueprints.superadmin import superadmin_bp
+    from .blueprints.faculty.routes import faculty_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(auth_bp)
     app.register_blueprint(professional_bp)
     app.register_blueprint(superadmin_bp)
+    app.register_blueprint(faculty_bp, url_prefix='/faculty')
 
     # Pusher is initialized lazily in realtime.py
     

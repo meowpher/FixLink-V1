@@ -18,23 +18,24 @@ const SVG_OUTLINE = `
  * @param {Array} rooms 
  * @param {string} floorLevel 
  * @param {boolean} isAdmin
+ * @param {boolean} isReport
  */
-export function renderFloorMap(container, rooms, floorLevel, isAdmin = false) {
+export function renderFloorMap(container, rooms, floorLevel, isAdmin = false, isReport = false) {
     const detailedFloors = ['1', '2', '3', '4', '5', '7'];
 
     if (floorLevel === '0') {
-        renderGroundFloor(container, rooms, isAdmin);
+        renderGroundFloor(container, rooms, isAdmin, isReport);
     } else if (detailedFloors.includes(floorLevel) && rooms.length >= 10) {
-        renderDetailedLayout(container, rooms, floorLevel, isAdmin);
+        renderDetailedLayout(container, rooms, floorLevel, isAdmin, isReport);
     } else {
-        renderGenericFloor(container, rooms, isAdmin);
+        renderGenericFloor(container, rooms, isAdmin, isReport);
     }
 }
 
 /**
  * Ground floor (Vyas V1) specific layout.
  */
-export function renderGroundFloor(container, rooms, isAdmin = false) {
+export function renderGroundFloor(container, rooms, isAdmin = false, isReport = false) {
     const findRoom = (num) => rooms.find(r => r.number === num);
 
     const renderRoomRect = (roomNum, x, y, w, h, labelText, typeOverride) => {
@@ -60,8 +61,9 @@ export function renderGroundFloor(container, rooms, isAdmin = false) {
             else if (isAssigned) className += ' assigned';
         }
 
-        const attrs = room ?
-            `data-room="${roomNum}" data-room-id="${roomId}" onclick="selectRoom('${roomNum}', ${roomId}, '${roomName}', '${type}')"` :
+        const isInteractable = room && (isAdmin || isReport || !['washroom', 'lift', 'stairs', 'mgmt'].includes(type));
+        const attrs = isInteractable ?
+            `data-room="${roomNum}" data-room-id="${roomId}" onclick="selectRoom(event, '${roomNum}', '${roomId}', '${roomName}', '${type}')"` :
             'class="room-disabled"';
 
         let circleHtml = isAdmin ? renderAdminIndicators(x, y, w, isIssue, isInProgress, isAssigned) : '';
@@ -95,7 +97,7 @@ export function renderGroundFloor(container, rooms, isAdmin = false) {
 /**
  * Detailed layout for standard floors (1, 2, 3, 4, 5, 7).
  */
-export function renderDetailedLayout(container, rooms, floorLevel, isAdmin = false) {
+export function renderDetailedLayout(container, rooms, floorLevel, isAdmin = false, isReport = false) {
     const findRoom = (num) => rooms.find(r => r.number === num);
     const getRoomNum = (suffix) => `VY${floorLevel}${suffix}`;
 
@@ -122,8 +124,9 @@ export function renderDetailedLayout(container, rooms, floorLevel, isAdmin = fal
             else if (isAssigned) className += ' assigned';
         }
 
-        const attrs = room ?
-            `data-room="${roomNum}" data-room-id="${roomId}" onclick="selectRoom('${roomNum}', ${roomId}, '${roomName}', '${type}')"` :
+        const isInteractable = room && (isAdmin || isReport || !['washroom', 'lift', 'stairs', 'mgmt'].includes(type));
+        const attrs = isInteractable ?
+            `data-room="${roomNum}" data-room-id="${roomId}" onclick="selectRoom(event, '${roomNum}', '${roomId}', '${roomName}', '${type}')"` :
             'class="room-disabled"';
 
         let circleHtml = isAdmin ? renderAdminIndicators(x, y, w, isIssue, isInProgress, isAssigned) : '';
@@ -157,7 +160,7 @@ export function renderDetailedLayout(container, rooms, floorLevel, isAdmin = fal
 /**
  * Generic grid layout for non-standardized floors (e.g. 6th).
  */
-export function renderGenericFloor(container, rooms, isAdmin = false) {
+export function renderGenericFloor(container, rooms, isAdmin = false, isReport = false) {
     const roomsHtml = rooms.map(room => {
         let roomClass = 'room-block';
         if (room.room_type === 'class') roomClass += ' classroom';
@@ -185,7 +188,7 @@ export function renderGenericFloor(container, rooms, isAdmin = false) {
             <div class="${roomClass}" 
                  data-room="${room.number}" 
                  data-room-id="${room.id}"
-                 onclick="selectRoom('${room.number}', ${room.id}, '${roomName}', '${room.room_type}')">
+                 onclick="selectRoom(event, '${room.number}', '${room.id}', '${roomName}', '${room.room_type}')">
                 <span class="room-label">${room.number}${indicatorHtml}</span>
             </div>
         `;
